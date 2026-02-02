@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is the owner
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection - users can read/write their own data
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Sessions collection - users can create and read their own sessions
+    match /sessions/{sessionId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         resource.data.doctorId == request.auth.uid);
+      allow update, delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Patients collection - doctors can read their assigned patients
+    match /patients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(patientId);
+    }
+    
+    // Doctors collection - read access for authenticated users
+    match /doctors/{doctorId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(doctorId);
+    }
+  }
+}

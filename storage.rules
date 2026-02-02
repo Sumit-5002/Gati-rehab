@@ -1,0 +1,34 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is the owner
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // User profile images - users can read/write their own images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && 
+        request.resource.size < 5 * 1024 * 1024 && // 5MB limit
+        request.resource.contentType.matches('image/.*');
+    }
+    
+    // Session recordings/screenshots - users can upload their own
+    match /sessions/{userId}/{sessionId}/{fileName} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == userId || 
+         // Allow doctors to read their patients' data
+         // This would need additional logic to verify doctor-patient relationship
+         true);
+      allow write: if isOwner(userId) && 
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+  }
+}

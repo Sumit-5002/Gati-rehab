@@ -1,0 +1,23 @@
+{
+  "name": "Gati Rehab - AI Physical Therapy Assistant",
+  "short_name": "Gati Rehab",
+  "description": "AI-powered virtual rehabilitation assistant for remote physical therapy",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "medical", "fitness"],
+  "prefer_related_applications": false,
+  "offline_enabled": true,
+  "screenshots": []
+}
