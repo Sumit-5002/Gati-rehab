@@ -161,19 +161,19 @@ const WorkoutSession = () => {
             <span className="font-bold">Back to Dashboard</span>
           </button>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex flex-col items-center">
-              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Time</span>
-              <div className="flex items-center gap-2 bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-700">
-                <Timer className="w-4 h-4 text-blue-400" />
-                <span className="text-xl font-mono font-bold">{formatTime(elapsedTime)}</span>
+              <span className="text-[8px] sm:text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Time</span>
+              <div className="flex items-center gap-2 bg-slate-800/50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-700">
+                <Timer className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
+                <span className="text-base sm:text-xl font-mono font-bold">{formatTime(elapsedTime)}</span>
               </div>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Score</span>
-              <div className="flex items-center gap-2 bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-700">
-                <Award className="w-4 h-4 text-amber-400" />
-                <span className="text-xl font-bold">{formQuality}%</span>
+              <span className="text-[8px] sm:text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Score</span>
+              <div className="flex items-center gap-2 bg-slate-800/50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-700">
+                <Award className="w-3 h-3 sm:w-4 sm:h-4 text-amber-400" />
+                <span className="text-base sm:text-xl font-bold">{formQuality}%</span>
               </div>
             </div>
           </div>
@@ -182,7 +182,7 @@ const WorkoutSession = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Viewport */}
           <div className="lg:col-span-3 space-y-6">
-            <div className="relative rounded-3xl overflow-hidden border-4 border-slate-800 shadow-2xl bg-black aspect-video flex items-center justify-center">
+            <div className="relative rounded-[2rem] sm:rounded-3xl overflow-hidden border-[6px] sm:border-8 border-slate-800 shadow-2xl bg-black aspect-[4/3] sm:aspect-video flex items-center justify-center">
               {/* Visual Feedback Overlay Border */}
               <div
                 className="absolute inset-0 pointer-events-none z-20 transition-all duration-300"

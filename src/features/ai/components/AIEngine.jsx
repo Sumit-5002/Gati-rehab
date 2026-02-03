@@ -16,16 +16,30 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
   const [error, setError] = useState(null);
   const [fps, setFps] = useState(0);
   const poseDetectorRef = useRef(null);
-  const lastFrameTimeRef = useRef(Date.now());
+  const lastFrameTimeRef = useRef(performance.now());
+  const lastVideoTimeRef = useRef(-1);
+  const lastTimestampRef = useRef(0);
   const frameCountRef = useRef(0);
   const previousAnglesRef = useRef({});
+
+  // Use refs for callbacks to avoid re-triggering the effect loop
+  const onPoseDetectedRef = useRef(onPoseDetected);
+  const onFeedbackUpdateRef = useRef(onFeedbackUpdate);
+
+  useEffect(() => {
+    onPoseDetectedRef.current = onPoseDetected;
+  }, [onPoseDetected]);
+
+  useEffect(() => {
+    onFeedbackUpdateRef.current = onFeedbackUpdate;
+  }, [onFeedbackUpdate]);
 
   // Initialize MediaPipe Pose Landmarker
   useEffect(() => {
     const loadModel = async () => {
       try {
         const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
-        
+
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
@@ -75,18 +89,31 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
       const video = webcamRef.current.video;
       const canvas = canvasRef.current;
 
+      // Skip processing if the video frame hasn't changed
+      if (video.currentTime === lastVideoTimeRef.current) {
+        animationFrameId = requestAnimationFrame(detectPose);
+        return;
+      }
+      lastVideoTimeRef.current = video.currentTime;
+
       if (canvas) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
       }
 
       try {
-        const results = poseDetectorRef.current.detectForVideo(video, Date.now());
+        // Ensure strictly monotonically increasing timestamps for MediaPipe
+        let timestamp = performance.now();
+        if (timestamp <= lastTimestampRef.current) {
+          timestamp = lastTimestampRef.current + 1;
+        }
+        lastTimestampRef.current = timestamp;
+
+        const results = poseDetectorRef.current.detectForVideo(video, timestamp);
 
         if (results.landmarks && results.landmarks.length > 0) {
-          const landmarks = results.landmarks[0]; // Get first person's landmarks (33 keypoints)
+          const landmarks = results.landmarks[0];
 
-          // Convert landmarks to array format for angle calculations
           const keypoints = landmarks.map(landmark => ({
             x: landmark.x,
             y: landmark.y,
@@ -94,23 +121,19 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
             visibility: landmark.visibility,
           }));
 
-          // Calculate angles
           const angles = calculateAngles(keypoints);
 
           if (angles) {
-            // Generate real-time feedback
             const feedback = generateRealTimeFeedback(angles, exerciseType, {
               previousAngles: previousAnglesRef.current,
             });
 
-            // Play audio cue if needed
             if (feedback.audioCue && feedback.severity === 'error') {
               playAudioCue(feedback.audioCue);
             }
 
-            // Update parent component
-            if (onPoseDetected) {
-              onPoseDetected({
+            if (onPoseDetectedRef.current) {
+              onPoseDetectedRef.current({
                 keypoints,
                 angles,
                 feedback,
@@ -118,21 +141,17 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
               });
             }
 
-            // Update feedback display
-            if (onFeedbackUpdate) {
-              onFeedbackUpdate(feedback);
+            if (onFeedbackUpdateRef.current) {
+              onFeedbackUpdateRef.current(feedback);
             }
 
-            // Store for next frame comparison
             previousAnglesRef.current = angles;
           }
 
-          // Draw landmarks on canvas
           drawLandmarks(keypoints, canvas);
 
-          // Calculate and update FPS
           frameCountRef.current++;
-          const now = Date.now();
+          const now = performance.now();
           if (now - lastFrameTimeRef.current >= 1000) {
             setFps(frameCountRef.current);
             frameCountRef.current = 0;
@@ -155,7 +174,7 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isCameraActive, isModelLoaded, onPoseDetected, onFeedbackUpdate, exerciseType]);
+  }, [isCameraActive, isModelLoaded, exerciseType]);
 
   // Draw pose landmarks on canvas
   const drawLandmarks = (keypoints, canvas) => {
@@ -231,11 +250,10 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate }) => {
         </div>
         <button
           onClick={toggleCamera}
-          className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-            isCameraActive
+          className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${isCameraActive
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-blue-500 hover:bg-blue-600 text-white'
-          }`}
+            }`}
           disabled={!isModelLoaded}
         >
           {isCameraActive ? (
