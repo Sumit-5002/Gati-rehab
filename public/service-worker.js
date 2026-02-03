@@ -11,13 +11,13 @@ const PRECACHE_ASSETS = [
   '/src/main.jsx',
   '/src/App.jsx',
   '/src/index.css',
-  '/vite.svg',
+  '/logo.png',
 ];
 
 // Install event - cache essential assets
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing...');
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Precaching app shell');
@@ -90,7 +90,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Network failed, check if we have an offline fallback
           console.log('[Service Worker] Network failed, serving offline page');
-          
+
           // Return offline page for navigation requests
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html');
@@ -103,7 +103,7 @@ self.addEventListener('fetch', (event) => {
 // Background sync event (for syncing data when back online)
 self.addEventListener('sync', (event) => {
   console.log('[Service Worker] Background sync:', event.tag);
-  
+
   if (event.tag === 'sync-session-data') {
     event.waitUntil(
       // This will be called when the device comes back online
@@ -116,10 +116,10 @@ self.addEventListener('sync', (event) => {
 async function syncSessionData() {
   try {
     console.log('[Service Worker] Syncing session data...');
-    
+
     // TODO: Implement actual sync logic
     // This should read from IndexedDB/localStorage and POST to Firestore
-    
+
     return Promise.resolve();
   } catch (error) {
     console.error('[Service Worker] Sync failed:', error);
@@ -130,11 +130,11 @@ async function syncSessionData() {
 // Push notification event (for future use)
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push notification received');
-  
+
   const options = {
     body: event.data ? event.data.text() : 'New notification from Gati Rehab',
-    icon: '/vite.svg',
-    badge: '/vite.svg',
+    icon: '/logo.png',
+    badge: '/logo.png',
     vibrate: [200, 100, 200],
   };
 

@@ -120,30 +120,32 @@ const PatientDashboard = () => {
 
       <main className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
-          <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none mb-4">
-              Recovery <span className="text-blue-600">Central</span>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 sm:mb-14">
+          <div className="space-y-3">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tighter leading-tight lg:leading-[1.1]">
+              Recovery <span className="text-blue-600">Hub</span>
             </h1>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-100">
-                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                <p className="text-sm font-black text-slate-700">Welcome back, {userData?.name?.split(' ')[0] || 'Warrior'}</p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 px-3.5 py-2 bg-white rounded-2xl shadow-sm border border-slate-100/50">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-sm shadow-emerald-200"></div>
+                <p className="text-xs sm:text-sm font-black text-slate-600 font-mono tracking-tight uppercase">
+                  Station: {userData?.name?.split(' ')[0] || 'Warrior'}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 w-full lg:w-auto">
             <button
               onClick={() => navigate('/workout', { state: { devMode: true } })}
-              className="hidden sm:flex items-center gap-2 bg-blue-600/10 text-blue-600 px-6 py-4 rounded-[1.5rem] border border-blue-200 font-bold hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-600/5 group"
+              className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-4 lg:py-3.5 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group active:scale-95"
             >
-              <Terminal className="w-5 h-5" />
-              <span>Launch Neural Lab</span>
+              <Terminal className="w-4 h-4 text-blue-400" />
+              <span className="text-xs uppercase tracking-widest">Neural Lab</span>
             </button>
-            <button className="bg-white p-4 rounded-3xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-xl shadow-slate-200/50 relative group">
-              <Bell className="w-6 h-6 transition-transform group-hover:rotate-12" />
-              <span className="absolute top-4 right-4 w-3 h-3 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>
+            <button className="bg-white p-4 rounded-2xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-lg active:scale-90 relative">
+              <Bell className="w-5 h-5 transition-transform" />
+              <span className="absolute top-4 right-4 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>
             </button>
           </div>
         </div>
@@ -152,83 +154,84 @@ const PatientDashboard = () => {
           {/* Main Content Column */}
           <div className="xl:col-span-8 space-y-10">
             {/* Massive Hero Section */}
-            <div className="relative overflow-hidden bg-slate-900 rounded-[2rem] sm:rounded-[3.5rem] p-6 sm:p-10 md:p-16 text-white shadow-3xl shadow-slate-900/20">
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
-                <div className="flex-1 space-y-8">
-                  <div className="inline-flex items-center gap-3 bg-blue-500/10 backdrop-blur-3xl px-6 py-2.5 rounded-full border border-blue-500/20">
-                    <Flame className="w-5 h-5 text-orange-400" />
-                    <span className="text-sm font-black uppercase tracking-widest">{stats.streak} DAY RECOVERY STREAK</span>
+            <div className="relative overflow-hidden bg-slate-900 rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 lg:p-14 text-white shadow-3xl shadow-slate-900/20">
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 md:gap-14">
+                <div className="w-full flex-1 space-y-6 sm:space-y-8 text-center md:text-left">
+                  <div className="inline-flex items-center justify-center md:justify-start gap-2.5 bg-blue-500/10 backdrop-blur-3xl px-4 py-2 rounded-full border border-blue-500/20 mx-auto md:mx-0">
+                    <Flame className="w-4 h-4 text-orange-400 animate-pulse" />
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">{stats.streak} DAY STREAK</span>
                   </div>
 
-                  <h2 className="text-3xl sm:text-5xl md:text-6xl font-black leading-none tracking-tighter">
-                    Finish your <br />
-                    <span className="text-blue-400">daily routine</span>
+                  <h2 className="text-5xl sm:text-6xl lg:text-8xl font-black leading-[1.1] sm:leading-[1.05] md:leading-[1] tracking-tighter">
+                    Ready for your <br className="hidden sm:block" />
+                    <span className="text-blue-500">session?</span>
                   </h2>
 
-                  <p className="text-slate-400 text-xl font-bold max-w-md leading-relaxed">
-                    You're just {todayRoutine.filter(e => !e.completed).length} exercises away from your best self today.
+                  <p className="text-slate-400 text-lg sm:text-xl lg:text-2xl font-bold max-w-sm mx-auto md:mx-0 leading-relaxed opacity-90">
+                    Complete your morning routine to stay ahead.
                   </p>
 
-                  <div className="flex flex-wrap gap-6 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-4 pt-4 sm:pt-6">
                     <button
                       onClick={() => navigate('/workout')}
-                      className="group bg-blue-600 text-white px-10 py-5 rounded-[2rem] font-black flex items-center gap-4 hover:bg-blue-500 transition-all transform active:scale-95 shadow-2xl shadow-blue-600/40"
+                      className="group bg-blue-600 text-white px-8 py-4.5 sm:px-10 sm:py-5 rounded-2xl sm:rounded-[2rem] font-black flex items-center justify-center gap-4 hover:bg-blue-500 hover:scale-[1.02] transition-all transform active:scale-95 shadow-2xl shadow-blue-600/40"
                     >
-                      <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                        <Play className="w-5 h-5 fill-white" />
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-all">
+                        <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-white" />
                       </div>
-                      <span className="text-lg">Resume Session</span>
+                      <span className="text-base sm:text-lg">Resume Program</span>
                     </button>
-                    <button className="px-8 py-5 rounded-[2rem] font-black bg-white/5 border border-white/10 hover:bg-white/10 transition-all backdrop-blur-xl">
-                      Routine Details
+                    <button className="px-8 py-4.5 sm:py-5 rounded-2xl sm:rounded-[2rem] font-black bg-white/5 border border-white/10 hover:bg-white/10 transition-all backdrop-blur-xl text-sm sm:text-base">
+                      Plan Overview
                     </button>
                   </div>
                 </div>
 
-                <div className="hidden md:block w-72 h-72 relative">
-                  {/* Visual progress indicator in hero */}
+                {/* Progress Visualizer - Hidden on smaller screens inside hero for more vertical space, or scaled down */}
+                <div className="flex md:block w-40 h-40 sm:w-56 sm:h-56 lg:w-72 lg:h-72 relative items-center justify-center shrink-0">
+                  <div className="absolute inset-0 bg-blue-500/10 rounded-full animate-pulse-slow"></div>
                   <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="144" cy="144" r="130" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-white/5" />
-                    <circle cx="144" cy="144" r="130" stroke="currentColor" strokeWidth="12" fill="transparent"
-                      strokeDasharray={816}
-                      strokeDashoffset={816 - (816 * (stats.completed / (stats.weeklyGoal || 1)))}
+                    <circle cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/5" />
+                    <circle cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="8" fill="transparent"
+                      strokeDasharray="264"
+                      strokeDashoffset={264 - (264 * (stats.completed / (stats.weeklyGoal || 1)))}
                       strokeLinecap="round"
-                      className="text-blue-500 transition-all duration-1000" />
+                      className="text-blue-500 transition-all duration-1000 shadow-xl" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-5xl font-black leading-none">{Math.round((stats.completed / (stats.weeklyGoal || 1)) * 100)}%</span>
-                    <span className="text-xs font-black uppercase text-slate-500 tracking-widest mt-2">Goal Reach</span>
+                    <span className="text-4xl sm:text-6xl font-black leading-none">{Math.round((stats.completed / (stats.weeklyGoal || 1)) * 100)}%</span>
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1 sm:mt-2">Capacity</span>
                   </div>
                 </div>
               </div>
 
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] -mr-64 -mt-64"></div>
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-[80px] -ml-40 -mb-40"></div>
+              {/* Decorative gradients */}
+              <div className="absolute top-0 right-0 w-64 h-64 sm:w-[500px] sm:h-[500px] bg-blue-600/20 rounded-full blur-[100px] sm:blur-[160px] -mr-32 -mt-32 sm:-mr-64 sm:-mt-64"></div>
+              <div className="absolute bottom-0 left-0 w-40 h-40 sm:w-80 h-80 bg-indigo-600/10 rounded-full blur-[60px] sm:blur-[100px] -ml-20 -mb-20 sm:-ml-40 sm:-mb-40"></div>
             </div>
 
             {/* Performance Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 transition-all">
               <StatCard
                 icon={<Zap className="w-5 h-5 sm:w-6 sm:h-6" />}
-                title="Adherence"
+                title="Focus"
                 value={`${stats.adherenceRate}%`}
                 trend="+12%"
                 color="blue"
               />
               <StatCard
                 icon={<Target className="w-5 h-5 sm:w-6 sm:h-6" />}
-                title="Weekly"
+                title="Progress"
                 value={`${stats.completed}/${stats.weeklyGoal}`}
                 trend="Goal"
                 color="indigo"
               />
-              <div className="col-span-2 md:col-span-1">
+              <div className="col-span-2 lg:col-span-1">
                 <StatCard
                   icon={<ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />}
-                  title="Quality"
+                  title="Form Score"
                   value="A+"
-                  trend="Excellent"
+                  trend="Stable"
                   color="emerald"
                 />
               </div>
@@ -298,19 +301,22 @@ const PatientDashboard = () => {
               </div>
             </div>
 
-            {/* Quick Actions Integration */}
-            <div className="bg-white rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl shadow-slate-200/50 border border-slate-50">
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-6 sm:mb-8">Clinical Tools</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <ActionTile icon={<Video className="w-6 h-6" />} label="Connect Dr." color="blue" />
+            {/* Quick Actions - Higher Priority on Mobile */}
+            <div className="bg-white rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl shadow-slate-200/40 border border-slate-50">
+              <div className="mb-6">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-none mb-2 text-center md:text-left">Clinical Tools</h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">Quick Access Laboratory</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-4">
+                <ActionTile icon={<Video className="w-5 h-5" />} label="Physio Link" color="blue" />
                 <ActionTile
-                  icon={<Plus className="w-6 h-6" />}
-                  label="Log Symptoms"
+                  icon={<Plus className="w-5 h-5" />}
+                  label="Log Pain"
                   color="rose"
                   onClick={() => setPainModalOpen(true)}
                 />
-                <ActionTile icon={<FileText className="w-6 h-6" />} label="Digital Reports" color="indigo" />
-                <ActionTile icon={<TrendingUp className="w-6 h-6" />} label="Recovery Trend" color="emerald" />
+                <ActionTile icon={<FileText className="w-5 h-5" />} label="Reports" color="indigo" />
+                <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends" color="emerald" />
               </div>
             </div>
 
@@ -385,15 +391,15 @@ const StatCard = ({ icon, title, value, trend, color }) => {
   };
 
   return (
-    <div className="group bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-50 shadow-xl shadow-slate-200/30 transition-all hover:shadow-2xl hover:-translate-y-1">
-      <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-8 transition-transform group-hover:scale-110 ${colorStyles[color]} border shadow-sm`}>
+    <div className="group bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-50 shadow-xl shadow-slate-200/20 transition-all hover:shadow-2xl hover:-translate-y-1">
+      <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-4 sm:mb-8 transition-all group-hover:scale-110 ${colorStyles[color]} border shadow-sm`}>
         {icon}
       </div>
-      <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">{title}</p>
-      <h4 className="text-2xl sm:text-4xl font-black text-slate-900 leading-none mb-2 sm:mb-3">{value}</h4>
-      <p className="text-[10px] sm:text-xs font-bold text-slate-400 flex items-center gap-1.5">
-        <span className={color === 'emerald' ? 'text-emerald-500' : 'text-blue-500'}>{trend}</span>
-      </p>
+      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 leading-none">{title}</p>
+      <div className="flex items-baseline gap-2">
+        <h4 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter">{value}</h4>
+        <span className={`text-[9px] font-black uppercase tracking-widest ${color === 'emerald' ? 'text-emerald-500' : 'text-blue-500'} opacity-70`}>{trend}</span>
+      </div>
     </div>
   );
 };

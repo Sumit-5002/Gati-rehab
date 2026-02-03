@@ -6,13 +6,16 @@
   <link rel="icon" type="image/png" href="/logo.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.gstatic.com https://lh3.googleusercontent.com; frame-src https://www.google.com https://gati-rehab.firebaseapp.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.google.com https://cdn.jsdelivr.net;">
+
   <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#2563EB" />
   <meta name="description" content="AI-powered virtual rehabilitation assistant for remote physical therapy" />
   <link rel="manifest" href="/manifest.json" />
 
-  <!-- iOS Meta Tags -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <!-- Mobile Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Gati Rehab" />
