@@ -30,7 +30,14 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
       <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-2 sm:py-4">
         <div className="flex items-center justify-between">
           {/* Logo/Brand */}
-          <div className="flex items-center gap-2 sm:gap-4 cursor-pointer group shrink-0" onClick={() => navigate('/')}>
+          <div
+            className="flex items-center gap-2 sm:gap-4 cursor-pointer group shrink-0"
+            onClick={() => navigate('/')}
+            role="link"
+            tabIndex={0}
+            aria-label="Go to home"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/'); } }}
+          >
             <div className="relative scale-[0.8] sm:scale-100">
               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-slate-200 border border-slate-100 p-1 group-hover:rotate-6 transition-transform">
                 <img src="/logo.png" alt="Gati Logo" className="w-full h-full object-contain" />
@@ -107,7 +114,7 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
                 <button
                   onClick={onSettingsClick}
                   className={`${isDark ? 'bg-white/5 text-slate-400 border-white/10 hover:text-white' : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-900'} p-2 sm:p-3 border rounded-xl transition-all`}
-                  title="Settings"
+                  aria-label="Open settings"
                 >
                   <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -116,6 +123,7 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
               <button
                 onClick={handleLogout}
                 className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all transform active:scale-95 group shadow-sm hover:shadow-rose-100"
+                aria-label="Logout"
               >
                 <LogOut className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:translate-x-0.5" />
               </button>
@@ -124,36 +132,7 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation - Patient Only */}
-      {userType === 'patient' && (
-        <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] w-[90%] max-w-[400px]">
-          <div className="bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-[2.25rem] p-1.5 flex items-center justify-between shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-            <MobileNavButton
-              active={isActive('/') || isActive('/patient-dashboard')}
-              onClick={() => navigate('/patient-dashboard')}
-              icon={<Compass className="w-5 h-5" />}
-              label="Nexus"
-            />
-
-            <div className="relative -mt-10">
-              <button
-                onClick={() => navigate('/workout')}
-                className="w-14 h-14 bg-blue-600 rounded-[1.5rem] flex items-center justify-center shadow-2xl shadow-blue-600/40 border-[6px] border-[#F1F5F9] active:scale-90 transition-all group"
-              >
-                <Activity className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-              </button>
-            </div>
-
-            <MobileNavButton
-              active={isActive('/workout')}
-              onClick={() => navigate('/workout')}
-              icon={<Sparkles className="w-5 h-5" />}
-              label="Stats"
-            />
-          </div>
-        </div>
-      )}
-    </header>
+      </header>
   );
 };
 
@@ -173,7 +152,7 @@ const NavButton = ({ active, onClick, icon, label }) => (
 const MobileNavButton = ({ active, onClick, icon, label }) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1.5 px-6 py-2 transition-all ${active ? 'text-blue-400' : 'text-slate-500'}`}
+    className={`flex flex-col items-center gap-1.5 px-6 py-2 transition-all ${active ? 'text-blue-400' : 'text-slate-300'}`}
   >
     {icon}
     <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>

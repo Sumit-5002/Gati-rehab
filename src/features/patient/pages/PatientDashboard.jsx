@@ -112,13 +112,13 @@ const PatientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] pb-20">
+    <div className="min-h-screen bg-[#F1F5F9] pb-28">
       <NavHeader
         userType="patient"
         onSettingsClick={() => setSettingsOpen(true)}
       />
 
-      <main className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
+      <main role="main" className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 sm:mb-14">
           <div className="space-y-3">
@@ -143,7 +143,10 @@ const PatientDashboard = () => {
               <Terminal className="w-4 h-4 text-blue-400" />
               <span className="text-xs uppercase tracking-widest">Neural Lab</span>
             </button>
-            <button className="bg-white p-4 rounded-2xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-lg active:scale-90 relative">
+            <button 
+              className="bg-white p-4 rounded-2xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-lg active:scale-90 relative"
+              aria-label="View notifications"
+            >
               <Bell className="w-5 h-5 transition-transform" />
               <span className="absolute top-4 right-4 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>
             </button>
@@ -181,7 +184,10 @@ const PatientDashboard = () => {
                       </div>
                       <span className="text-base sm:text-lg">Resume Program</span>
                     </button>
-                    <button className="px-8 py-4.5 sm:py-5 rounded-2xl sm:rounded-[2rem] font-black bg-white/5 border border-white/10 hover:bg-white/10 transition-all backdrop-blur-xl text-sm sm:text-base">
+                    <button 
+                      className="px-8 py-4.5 sm:py-5 rounded-2xl sm:rounded-[2rem] font-black bg-white/5 border border-white/10 hover:bg-white/10 transition-all backdrop-blur-xl text-sm sm:text-base"
+                      aria-label="View treatment plan overview"
+                    >
                       Plan Overview
                     </button>
                   </div>
@@ -242,7 +248,7 @@ const PatientDashboard = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-12">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-none mb-2">Performance History</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Your recovery path records</p>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Your recovery path records</p>
                 </div>
                 <button className="flex items-center gap-2 text-blue-600 font-black text-xs group text-left">
                   Full Analytics History <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -285,8 +291,8 @@ const PatientDashboard = () => {
                         {ex.completed ? <CheckCircle className="w-7 h-7" /> : <Play className="w-5 h-5 ml-1" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-black text-slate-800 truncate leading-none mb-1.5">{ex.name}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{ex.sets} Sets • {ex.reps} Reps</p>
+                        <p className="font-black text-slate-800 truncate leading-none mb-1.5">{ex.name}</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{ex.sets} Sets • {ex.reps} Reps</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-200 group-hover/item:text-blue-500 transition-colors" />
                     </div>
@@ -395,9 +401,9 @@ const StatCard = ({ icon, title, value, trend, color }) => {
       <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-4 sm:mb-8 transition-all group-hover:scale-110 ${colorStyles[color]} border shadow-sm`}>
         {icon}
       </div>
-      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 leading-none">{title}</p>
+      <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1 leading-none">{title}</p>
       <div className="flex items-baseline gap-2">
-        <h4 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter">{value}</h4>
+        <p className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter">{value}</p>
         <span className={`text-[9px] font-black uppercase tracking-widest ${color === 'emerald' ? 'text-emerald-500' : 'text-blue-500'} opacity-70`}>{trend}</span>
       </div>
     </div>

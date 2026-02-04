@@ -1,10 +1,11 @@
 // Service Worker for PWA offline functionality
-// Owner: Member 6
+// Optimized for mobile performance and offline experience
 
-const CACHE_NAME = 'gati-rehab-v1';
-const RUNTIME_CACHE = 'gati-runtime-v1';
+const CACHE_NAME = 'gati-rehab-v2';
+const RUNTIME_CACHE = 'gati-runtime-v2';
+const API_CACHE = 'gati-api-v2';
 
-// Assets to cache on install
+// Assets to cache on install - Mobile optimized
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -12,15 +13,28 @@ const PRECACHE_ASSETS = [
   '/src/App.jsx',
   '/src/index.css',
   '/logo.png',
+  '/manifest.json',
+  // Critical CSS and JS for offline functionality
+  '/src/shared/components/NavHeader.jsx',
+  '/src/shared/components/PWAInstallPrompt.jsx',
+  '/src/features/auth/context/AuthContext.jsx',
 ];
 
-// Install event - cache essential assets
+// Mobile-optimized API endpoints to cache
+const API_ENDPOINTS = [
+  '/api/auth',
+  '/api/patients',
+  '/api/sessions',
+  '/api/ai',
+];
+
+// Install event - cache essential assets with mobile optimization
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
+  console.log('[Service Worker] Installing for mobile...');
 
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Precaching app shell');
+      console.log('[Service Worker] Precaching mobile app shell');
       return cache.addAll(PRECACHE_ASSETS);
     })
   );
@@ -37,7 +51,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE && cacheName !== API_CACHE) {
             console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -50,7 +64,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - mobile-optimized caching strategy
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
@@ -62,52 +76,79 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        console.log('[Service Worker] Serving from cache:', event.request.url);
-        return cachedResponse;
-      }
-
-      // Not in cache, fetch from network
-      return fetch(event.request)
-        .then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type === 'error') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          // Cache the fetched response for runtime
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-          return response;
-        })
-        .catch(() => {
-          // Network failed, check if we have an offline fallback
-          console.log('[Service Worker] Network failed, serving offline page');
-
-          // Return offline page for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
-    })
-  );
+  // Mobile-optimized caching strategy
+  if (event.request.destination === 'image') {
+    // Cache images with longer TTL for mobile
+    event.respondWith(cacheFirstStrategy(event.request, 'images'));
+  } else if (event.request.url.includes('/api/')) {
+    // API calls - network first with cache fallback
+    event.respondWith(networkFirstStrategy(event.request, API_CACHE));
+  } else {
+    // HTML and critical assets - cache first
+    event.respondWith(cacheFirstStrategy(event.request, RUNTIME_CACHE));
+  }
 });
+
+// Cache-first strategy for static assets
+async function cacheFirstStrategy(request, cacheName) {
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) {
+    console.log('[Service Worker] Serving from cache:', request.url);
+    return cachedResponse;
+  }
+
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
+      const cache = await caches.open(cacheName);
+      cache.put(request, responseClone);
+    }
+    return networkResponse;
+  } catch (error) {
+    console.log('[Service Worker] Network failed, serving offline fallback');
+
+    // Return offline page for navigation requests
+    if (request.mode === 'navigate') {
+      return caches.match('/index.html');
+    }
+
+    // Return cached response or error
+    return cachedResponse || new Response('Offline', { status: 503 });
+  }
+}
+
+// Network-first strategy for API calls
+async function networkFirstStrategy(request, cacheName) {
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
+      const cache = await caches.open(cacheName);
+      cache.put(request, responseClone);
+    }
+    return networkResponse;
+  } catch (error) {
+    console.log('[Service Worker] API failed, serving cached response');
+    const cachedResponse = await caches.match(request);
+    return cachedResponse || new Response('{"error": "Offline"}', {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
 
 // Background sync event (for syncing data when back online)
 self.addEventListener('sync', (event) => {
-  console.log('[Service Worker] Background sync:', event.tag);
+  console.log('[Service Worker] Background sync for mobile:', event.tag);
 
   if (event.tag === 'sync-session-data') {
     event.waitUntil(
-      // This will be called when the device comes back online
       syncSessionData()
+    );
+  } else if (event.tag === 'sync-offline-data') {
+    event.waitUntil(
+      syncOfflineData()
     );
   }
 });
@@ -117,14 +158,107 @@ async function syncSessionData() {
   try {
     console.log('[Service Worker] Syncing session data...');
 
-    // TODO: Implement actual sync logic
-    // This should read from IndexedDB/localStorage and POST to Firestore
+    // Check for offline session data
+    const offlineData = await getOfflineData('session_data');
+
+    if (offlineData && offlineData.length > 0) {
+      for (const session of offlineData) {
+        try {
+          await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(session)
+          });
+
+          // Remove synced data
+          await removeOfflineData('session_data', session.id);
+        } catch (error) {
+          console.error('Failed to sync session:', error);
+        }
+      }
+    }
 
     return Promise.resolve();
   } catch (error) {
-    console.error('[Service Worker] Sync failed:', error);
+    console.error('[Service Worker] Session sync failed:', error);
     return Promise.reject(error);
   }
+}
+
+// Helper function to sync offline data
+async function syncOfflineData() {
+  try {
+    console.log('[Service Worker] Syncing offline data...');
+
+    // Sync various types of offline data
+    const dataTypes = ['session_data', 'patient_data', 'ai_feedback'];
+
+    for (const dataType of dataTypes) {
+      const offlineData = await getOfflineData(dataType);
+
+      if (offlineData && offlineData.length > 0) {
+        for (const data of offlineData) {
+          try {
+            await fetch(`/api/${dataType}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(data)
+            });
+
+            await removeOfflineData(dataType, data.id);
+          } catch (error) {
+            console.error(`Failed to sync ${dataType}:`, error);
+          }
+        }
+      }
+    }
+
+    return Promise.resolve();
+  } catch (error) {
+    console.error('[Service Worker] Offline data sync failed:', error);
+    return Promise.reject(error);
+  }
+}
+
+// IndexedDB helpers for offline data storage
+async function getOfflineData(storeName) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('gati-offline', 1);
+
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const transaction = db.transaction([storeName], 'readonly');
+      const store = transaction.objectStore(storeName);
+      const getAllRequest = store.getAll();
+
+      getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+      getAllRequest.onerror = () => reject(getAllRequest.error);
+    };
+
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function removeOfflineData(storeName, id) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('gati-offline', 1);
+
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      const deleteRequest = store.delete(id);
+
+      deleteRequest.onsuccess = () => resolve();
+      deleteRequest.onerror = () => reject(deleteRequest.error);
+    };
+
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // Push notification event (for future use)
@@ -136,6 +270,18 @@ self.addEventListener('push', (event) => {
     icon: '/logo.png',
     badge: '/logo.png',
     vibrate: [200, 100, 200],
+    tag: 'gati-rehab-notification',
+    requireInteraction: true,
+    actions: [
+      {
+        action: 'open',
+        title: 'Open App'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss'
+      }
+    ]
   };
 
   event.waitUntil(
@@ -148,7 +294,46 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification clicked');
   event.notification.close();
 
-  event.waitUntil(
-    clients.openWindow('/')
-  );
+  if (event.action === 'open') {
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
 });
+
+// Periodic background sync for data updates (if supported)
+self.addEventListener('periodicsync', (event) => {
+  console.log('[Service Worker] Periodic sync triggered');
+
+  if (event.tag === 'update-content') {
+    event.waitUntil(
+      updateContent()
+    );
+  }
+});
+
+async function updateContent() {
+  try {
+    console.log('[Service Worker] Updating content...');
+
+    // Pre-fetch critical content for offline use
+    const criticalUrls = [
+      '/',
+      '/patient-dashboard',
+      '/doctor-dashboard'
+    ];
+
+    const cache = await caches.open(RUNTIME_CACHE);
+    await Promise.all(
+      criticalUrls.map(url => fetch(url).then(response => {
+        if (response.ok) {
+          cache.put(url, response);
+        }
+      }))
+    );
+
+    console.log('[Service Worker] Content updated');
+  } catch (error) {
+    console.error('[Service Worker] Content update failed:', error);
+  }
+}

@@ -12,6 +12,39 @@ import {
   DEMO_CREDENTIALS,
 } from '../services/authService';
 
+// Move Input component outside to prevent re-creation on every render
+const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ringColor, textColor, ...props }) => (
+  <div className="relative group">
+    {icon && (
+      <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors ${textColor === 'text-blue-600' ? 'group-focus-within:text-blue-600' : 'group-focus-within:text-teal-600'}`}>
+        {icon}
+      </div>
+    )}
+    <input
+      id={id}
+      name={name}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full ${icon ? 'pl-11' : 'px-4'} pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 ${ringColor} ${className}`}
+      {...props}
+      required
+    />
+  </div>
+);
+
+// Move PrimaryButton component outside to prevent re-creation on every render
+const PrimaryButton = ({ loading, text, bgColor, bgHoverColor }) => (
+  <button
+    type="submit"
+    disabled={loading}
+    className={`w-full py-3.5 ${bgColor} ${bgHoverColor} disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
+  >
+    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : text}
+  </button>
+);
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const [userType, setUserType] = useState('patient'); // 'patient' or 'doctor'
@@ -115,41 +148,8 @@ const LoginPage = () => {
     setOtpSent(false); setResetSent(false);
   };
 
-  // --- Sub-components (Internal to have access to theme variables) ---
-
-  const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ...props }) => (
-    <div className="relative group">
-      {icon && (
-        <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:${textColor} transition-colors`}>
-          {icon}
-        </div>
-      )}
-      <input
-        id={id}
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-full ${icon ? 'pl-11' : 'px-4'} pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 ${ringColor} ${className}`}
-        {...props}
-        required
-      />
-    </div>
-  );
-
-  const PrimaryButton = ({ loading, text }) => (
-    <button
-      type="submit"
-      disabled={loading}
-      className={`w-full py-3.5 ${bgColor} ${bgHoverColor} disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
-    >
-      {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : text}
-    </button>
-  );
-
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${gradient} flex items-center justify-center p-4 sm:p-6 font-sans transition-colors duration-500`}>
+    <main className={`min-h-screen bg-gradient-to-br ${gradient} flex items-center justify-center p-4 sm:p-6 font-sans transition-colors duration-500`}>
       <div className="bg-white rounded-[2rem] shadow-2xl max-w-[28rem] w-full overflow-hidden border border-slate-100">
 
         {/* Header Section with Dynamic Branding */}
@@ -177,14 +177,18 @@ const LoginPage = () => {
 
             <button
               onClick={() => setUserType('patient')}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
+              aria-pressed={userType === 'patient'}
+              aria-label="Select Patient login"
             >
               <User className="w-4 h-4" />
               Patient
             </button>
             <button
               onClick={() => setUserType('doctor')}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'}`}
+              aria-pressed={userType === 'doctor'}
+              aria-label="Select Doctor login"
             >
               <Stethoscope className="w-4 h-4" />
               Doctor
@@ -207,6 +211,8 @@ const LoginPage = () => {
                   value={email}
                   onChange={setEmail}
                   autoComplete="email"
+                  ringColor={ringColor}
+                  textColor={textColor}
                 />
 
                 <div>
@@ -219,6 +225,8 @@ const LoginPage = () => {
                     value={password}
                     onChange={setPassword}
                     autoComplete="current-password"
+                    ringColor={ringColor}
+                    textColor={textColor}
                   />
                   <div className="text-right mt-1.5">
                     <button
@@ -238,7 +246,7 @@ const LoginPage = () => {
                   </div>
                 )}
 
-                <PrimaryButton loading={loading} text={userType === 'patient' ? 'Start Recovery' : 'Access Dashboard'} />
+                <PrimaryButton loading={loading} text={userType === 'patient' ? 'Start Recovery' : 'Access Dashboard'} bgColor={bgColor} bgHoverColor={bgHoverColor} />
               </form>
 
               {/* Enhanced Divider */}
@@ -247,7 +255,7 @@ const LoginPage = () => {
                   <div className="w-full border-t border-slate-200"></div>
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-white px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <span className="bg-white px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     Or continue with
                   </span>
                 </div>
@@ -259,8 +267,9 @@ const LoginPage = () => {
                   type="button"
                   onClick={handleGoogleLogin}
                   className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98]"
+                  aria-label="Sign in with Google"
                 >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
                   <span className="text-sm">Google</span>
                 </button>
                 <button
@@ -303,10 +312,12 @@ const LoginPage = () => {
                       onChange={setPhoneNumber}
                       className="text-center text-lg tracking-wide"
                       autoComplete="tel"
+                      ringColor={ringColor}
+                      textColor={textColor}
                     />
                     <div id="recaptcha-container" className="flex justify-center"></div>
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
-                    <PrimaryButton loading={loading} text="Send One-Time Password" />
+                    <PrimaryButton loading={loading} text="Send One-Time Password" bgColor={bgColor} bgHoverColor={bgHoverColor} />
                   </form>
                 ) : (
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
@@ -324,9 +335,11 @@ const LoginPage = () => {
                       className="text-center text-2xl tracking-[0.5em] font-mono"
                       maxLength="6"
                       autoComplete="one-time-code"
+                      ringColor={ringColor}
+                      textColor={textColor}
                     />
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
-                    <PrimaryButton loading={loading} text="Verify & Login" />
+                    <PrimaryButton loading={loading} text="Verify & Login" bgColor={bgColor} bgHoverColor={bgHoverColor} />
                   </form>
                 )
               )}
@@ -347,9 +360,11 @@ const LoginPage = () => {
                       value={resetEmail}
                       onChange={setResetEmail}
                       autoComplete="email"
+                      ringColor={ringColor}
+                      textColor={textColor}
                     />
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
-                    <PrimaryButton loading={loading} text="Send Recovery Link" />
+                    <PrimaryButton loading={loading} text="Send Recovery Link" bgColor={bgColor} bgHoverColor={bgHoverColor} />
                   </form>
                 ) : (
                   <div className="text-center py-6">
@@ -367,13 +382,13 @@ const LoginPage = () => {
 
           {/* Quick Demo Link */}
           <div className="mt-8 text-center">
-            <button onClick={fillDemoCredentials} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 hover:text-slate-500 transition-colors">
+            <button onClick={fillDemoCredentials} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors" aria-label="Fill form with demo credentials for testing">
               Activate Demo Credentials
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 
