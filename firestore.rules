@@ -17,46 +17,52 @@ service cloud.firestore {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/doctor_patients/$(request.auth.uid)/patients/$(patientId));
     }
+
+    // Helper to check ownership of a document based on its data
+    function isDocOwner(data) {
+      return isAuthenticated() && (data.userId == request.auth.uid || data.patientId == request.auth.uid);
+    }
+
+    // Helper to check if current user is the doctor for the patient in the document data
+    function isDocDoctor(data) {
+      return isDoctorOf(data.patientId) || isDoctorOf(data.userId);
+    }
     
     // 1. Users collection 
     match /users/{userId} {
-      // Users can read their own profile, and doctors can read profiles of patients assigned to them
       allow read: if isOwner(userId) || isDoctorOf(userId);
-      // Both owners and their doctors can update profiles (e.g. doctor assigning conditions)
       allow write: if isOwner(userId) || isDoctorOf(userId);
     }
     
     // 2. Routines Collection
     match /routines/{userId} {
-      // Patients read their own routines, doctors manage them
       allow read: if isOwner(userId) || isDoctorOf(userId);
       allow write: if isDoctorOf(userId);
     }
     
     // 3. Doctor Patients Collection
     match /doctor_patients/{doctorId}/patients/{patientId} {
-      // Only the doctor can manage their patient list
       allow read, write: if request.auth.uid == doctorId;
     }
     
     // 4. Sessions collection 
     match /sessions/{sessionId} {
-      // Support for both 'patientId' and 'userId' fields for compatibility
+      // For creation, we check the incoming data (request.resource.data)
       allow create: if isAuthenticated() && (
-        request.resource.data.patientId == request.auth.uid ||
-        request.resource.data.userId == request.auth.uid ||
-        isDoctorOf(request.resource.data.patientId)
+        isDocOwner(request.resource.data) || isDocDoctor(request.resource.data)
       );
+      // For reading, we check the existing data (resource.data)
       allow read: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        isDoctorOf(resource.data.patientId) ||
-        isDoctorOf(resource.data.userId)
+        isDocOwner(resource.data) || isDocDoctor(resource.data)
       );
-      allow update, delete: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid ||
-        resource.data.userId == request.auth.uid ||
-        isDoctorOf(resource.data.patientId)
+      // For updates, we check both current and future states to ensure security
+      allow update: if isAuthenticated() && (
+        isDocOwner(resource.data) && isDocOwner(request.resource.data) ||
+        isDocDoctor(resource.data) && isDocDoctor(request.resource.data)
+      );
+      // For deletion, we check current state
+      allow delete: if isAuthenticated() && (
+        isDocOwner(resource.data) || isDocDoctor(resource.data)
       );
     }
     
@@ -68,7 +74,6 @@ service cloud.firestore {
     
     // 6. Trends (Charts)
     match /trends/{patientId}/{document=**} {
-      // Trends are organized by patientId
       allow read: if isOwner(patientId) || isDoctorOf(patientId);
       allow write: if isDoctorOf(patientId);
     }
