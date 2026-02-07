@@ -11,9 +11,16 @@ service firebase.storage {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+
+    // Helper function to check if current user is the doctor of a patient
+    function isDoctorOf(userId) {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/doctor_patients/$(request.auth.uid)/patients/$(userId));
+    }
     
     // User profile images - users can read/write their own images
     match /users/{userId}/profile/{fileName} {
+      // Authenticated users (like doctors) can read profile images
       allow read: if isAuthenticated();
       allow write: if isOwner(userId) && 
         request.resource.size < 5 * 1024 * 1024 && // 5MB limit
@@ -22,11 +29,8 @@ service firebase.storage {
     
     // Session recordings/screenshots - users can upload their own
     match /sessions/{userId}/{sessionId}/{fileName} {
-      allow read: if isAuthenticated() && 
-        (request.auth.uid == userId || 
-         // Allow doctors to read their patients' data
-         // This would need additional logic to verify doctor-patient relationship
-         true);
+      // Both the owner and their assigned doctor can read session data
+      allow read: if isOwner(userId) || isDoctorOf(userId);
       allow write: if isOwner(userId) && 
         request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }
