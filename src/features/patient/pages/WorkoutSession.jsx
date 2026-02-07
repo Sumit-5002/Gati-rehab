@@ -21,7 +21,6 @@ import NavHeader from '../../../shared/components/NavHeader';
 import { useAuth } from '../../auth/context/AuthContext';
 import { saveSession } from '../services/sessionService';
 import { calculateFormQualityScore, trackRangeOfMotion } from '../utils/enhancedScoring';
-import { getVisualFeedbackStyle } from '../../ai/utils/realTimeFeedback';
 
 const WorkoutSession = () => {
   const navigate = useNavigate();
@@ -36,7 +35,7 @@ const WorkoutSession = () => {
   const [formQuality, setFormQuality] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [frameData, setFrameData] = useState([]);
+  const frameDataRef = useRef([]); // Use ref for high-frequency data to avoid re-renders
   const [realTimeFeedback, setRealTimeFeedback] = useState(null);
   const [isDevMode, setIsDevMode] = useState(location.state?.devMode || false);
 
@@ -53,35 +52,15 @@ const WorkoutSession = () => {
   const previousPhaseRef = useRef('start');
   const angleHistoryRef = useRef([]);
 
-  // Handle pose detection from AIEngine
-  const handlePoseDetected = useCallback((poseData) => {
-    if (!sessionActive) return;
-
-    const { angles, feedback: rtFeedback, timestamp } = poseData;
-
-    // Store frame data for later analysis (limited to prevent memory issues)
-    setFrameData(prev => {
-      const newData = [...prev, { angles, timestamp, feedback: rtFeedback }];
-      return newData.slice(-1000); // Keep last 1000 frames for scoring
-    });
-
-    // Update current angle (knee angle for knee-bends)
-    const primaryAngle = angles.leftKnee || angles.rightKnee || 0;
-    setCurrentAngle(Math.round(primaryAngle));
-    angleHistoryRef.current.push(primaryAngle);
-
-    // Update feedback display
-    if (rtFeedback) {
-      setFeedback(rtFeedback.message);
-      setRealTimeFeedback(rtFeedback);
+  const updateQualityScore = useCallback(() => {
+    if (frameDataRef.current.length > 0) {
+      const quality = calculateFormQualityScore(frameDataRef.current, currentExercise);
+      setFormQuality(quality.overallScore);
     }
-
-    // Detect rep completion
-    detectRepCompletion(angles);
-  }, [sessionActive]);
+  }, [currentExercise]);
 
   // Detect when a rep is completed
-  const detectRepCompletion = (angles) => {
+  const detectRepCompletion = useCallback((angles) => {
     // Dynamic joint selection based on exercise
     let primaryAngle = 180;
     let thresholdLow = 100;
@@ -107,14 +86,34 @@ const WorkoutSession = () => {
       previousPhaseRef.current = 'high';
       updateQualityScore();
     }
-  };
+  }, [currentExercise, updateQualityScore]);
 
-  const updateQualityScore = () => {
-    if (frameData.length > 0) {
-      const quality = calculateFormQualityScore(frameData, currentExercise);
-      setFormQuality(quality.overallScore);
+  // Handle pose detection from AIEngine
+  const handlePoseDetected = useCallback((poseData) => {
+    if (!sessionActive) return;
+
+    const { angles, feedback: rtFeedback, timestamp } = poseData;
+
+    // Store frame data in ref to avoid re-renders on every frame (up to 60fps)
+    frameDataRef.current.push({ angles, timestamp, feedback: rtFeedback });
+    if (frameDataRef.current.length > 1000) {
+      frameDataRef.current.shift();
     }
-  };
+
+    // Update current angle (knee angle for knee-bends)
+    const primaryAngle = angles.leftKnee || angles.rightKnee || 0;
+    setCurrentAngle(Math.round(primaryAngle));
+    angleHistoryRef.current.push(primaryAngle);
+
+    // Update feedback display
+    if (rtFeedback) {
+      setFeedback(rtFeedback.message);
+      setRealTimeFeedback(rtFeedback);
+    }
+
+    // Detect rep completion
+    detectRepCompletion(angles);
+  }, [sessionActive, detectRepCompletion]);
 
   // Timer effect
   useEffect(() => {
@@ -142,8 +141,8 @@ const WorkoutSession = () => {
   const handleEndSession = async () => {
     setSessionActive(false);
 
-    const finalQuality = calculateFormQualityScore(frameData, currentExercise);
-    const rom = trackRangeOfMotion(frameData, currentExercise);
+    const finalQuality = calculateFormQualityScore(frameDataRef.current, currentExercise);
+    const rom = trackRangeOfMotion(frameDataRef.current, currentExercise);
 
     const sessionData = {
       exerciseName: currentExercise,
@@ -171,8 +170,6 @@ const WorkoutSession = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const feedbackStyle = realTimeFeedback ? getVisualFeedbackStyle(realTimeFeedback.visualCue) : {};
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-white pb-28">
@@ -222,7 +219,7 @@ const WorkoutSession = () => {
                   onClick={() => {
                     setCurrentExercise(ex.id);
                     setRepCount(0);
-                    setFrameData([]);
+                    frameDataRef.current = [];
                   }}
                   className={`whitespace-nowrap px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${currentExercise === ex.id
                     ? 'bg-blue-600 text-white'

@@ -1,0 +1,3 @@
+## 2026-02-07 - High-Frequency Pose Tracking Loop Optimization
+**Learning:** In applications using MediaPipe or similar real-time AI tools at 30-60 FPS, React state updates and array copying (e.g., `[...prev, newData]`) create significant GC pressure and reconciliation overhead.
+**Action:** Move high-frequency data storage (like frame history) to `useRef`. Mutation of refs is $O(1)$ and avoids triggering re-renders of the entire component tree. Combine this with `React.memo` to isolate the AI engine from other state updates (like timers or angles). Also, batch canvas operations (`stroke()`, `fill()`) to minimize draw calls per frame.

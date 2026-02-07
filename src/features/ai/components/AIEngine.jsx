@@ -2,13 +2,20 @@
 // Handles MediaPipe Pose Landmark detection and real-time pose tracking
 // Owner: Sumit Prasad
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, Video, VideoOff, AlertCircle } from 'lucide-react';
 import { calculateAngles } from '../utils/angleCalculations';
 import { generateRealTimeFeedback, playAudioCue } from '../utils/realTimeFeedback';
 
-const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) => {
+// Separate FPS counter component to minimize re-renders
+const FPSDisplay = memo(({ fps }) => (
+  <span className="text-xs text-slate-400">
+    FPS: {fps}
+  </span>
+));
+
+const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) => {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -97,8 +104,11 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) 
       lastVideoTimeRef.current = video.currentTime;
 
       if (canvas) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Only set dimensions if they changed to avoid clearing the canvas and triggering reflows
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
       }
 
       try {
@@ -181,7 +191,8 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) 
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const { width, height } = canvas;
+    ctx.clearRect(0, 0, width, height);
 
     // Define connections between keypoints (pose skeleton)
     const connections = [
@@ -195,36 +206,40 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) 
       [28, 30], [30, 32], // Right foot
     ];
 
-    // Draw connections
+    // Draw connections - Batched stroke for performance
     ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 2;
+    ctx.beginPath();
     connections.forEach(([start, end]) => {
       const p1 = keypoints[start];
       const p2 = keypoints[end];
 
       if (p1 && p2 && p1.visibility > 0.5 && p2.visibility > 0.5) {
-        ctx.beginPath();
-        ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-        ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-        ctx.stroke();
+        ctx.moveTo(p1.x * width, p1.y * height);
+        ctx.lineTo(p2.x * width, p2.y * height);
       }
     });
+    ctx.stroke();
 
-    // Draw keypoints
+    // Draw keypoints - Batched fill for performance
+    ctx.fillStyle = '#00ff00';
+    ctx.beginPath();
+    keypoints.forEach((keypoint) => {
+      if (keypoint.visibility > 0.5) {
+        const x = keypoint.x * width;
+        const y = keypoint.y * height;
+        ctx.moveTo(x + 5, y);
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      }
+    });
+    ctx.fill();
+
+    // Draw visibility indicators separately to avoid fillStyle switching in loop
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '10px Arial';
     keypoints.forEach((keypoint, index) => {
       if (keypoint.visibility > 0.5) {
-        const x = keypoint.x * canvas.width;
-        const y = keypoint.y * canvas.height;
-
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, 2 * Math.PI);
-        ctx.fillStyle = '#00ff00';
-        ctx.fill();
-
-        // Draw visibility indicator
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '10px Arial';
-        ctx.fillText(index, x + 8, y - 8);
+        ctx.fillText(index, keypoint.x * width + 8, keypoint.y * height - 8);
       }
     });
   };
@@ -245,9 +260,7 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) 
           </span>
           </div>
           {isCameraActive && (
-            <span className="text-xs text-slate-400">
-              FPS: {fps}
-            </span>
+            <FPSDisplay fps={fps} />
           )}
           {Number.isFinite(repCount) && (
             <span className="text-xs font-bold text-blue-200 bg-blue-500/20 border border-blue-500/30 px-2.5 py-1 rounded-full">
@@ -332,6 +345,6 @@ const AIEngine = ({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount }) 
       )}
     </div>
   );
-};
+});
 
 export default AIEngine;
