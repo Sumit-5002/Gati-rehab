@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowLeft, Activity, Stethoscope } from 'lucide-react';
@@ -12,7 +11,7 @@ import {
   DEMO_CREDENTIALS,
 } from '../services/authService';
 
-// Move Input component outside to prevent re-creation on every render
+// Updated Input to handle disabled state styling
 const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ringColor, textColor, ...props }) => (
   <div className="relative group">
     {icon && (
@@ -27,19 +26,18 @@ const Input = ({ icon, type, placeholder, value, onChange, id, name, className =
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`w-full ${icon ? 'pl-11' : 'px-4'} pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 ${ringColor} ${className}`}
+      className={`w-full ${icon ? 'pl-11' : 'px-4'} pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100 ${ringColor} ${className}`}
       {...props}
       required
     />
   </div>
 );
 
-// Move PrimaryButton component outside to prevent re-creation on every render
 const PrimaryButton = ({ loading, text, bgColor, bgHoverColor }) => (
   <button
     type="submit"
     disabled={loading}
-    className={`w-full py-3.5 ${bgColor} ${bgHoverColor} disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
+    className={`w-full py-3.5 ${bgColor} ${bgHoverColor} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
   >
     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : text}
   </button>
@@ -90,6 +88,7 @@ const LoginPage = () => {
   // Handlers
   const handleEmailLogin = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError(''); setLoading(true);
     try {
       const { userData } = await loginWithEmail(email, password);
@@ -98,6 +97,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
     setError(''); setLoading(true);
     try {
       const { userData } = await loginWithGoogle();
@@ -107,6 +107,7 @@ const LoginPage = () => {
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError(''); setLoading(true);
     try {
       const recaptchaVerifier = setupRecaptcha('recaptcha-container');
@@ -119,6 +120,7 @@ const LoginPage = () => {
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError(''); setLoading(true);
     try {
       const { userData } = await verifyPhoneOTP(confirmationResult, otp);
@@ -128,6 +130,7 @@ const LoginPage = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError(''); setLoading(true);
     try {
       await resetPassword(resetEmail);
@@ -137,6 +140,7 @@ const LoginPage = () => {
   };
 
   const fillDemoCredentials = () => {
+    if (loading) return;
     const creds = userType === 'doctor' ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
     setEmail(creds.email);
     setPassword(creds.password);
@@ -144,6 +148,7 @@ const LoginPage = () => {
   };
 
   const resetToEmail = () => {
+    if (loading) return;
     setAuthMode('email'); setError(''); setSuccess('');
     setOtpSent(false); setResetSent(false);
   };
@@ -154,6 +159,13 @@ const LoginPage = () => {
 
         {/* Header Section with Dynamic Branding */}
         <div className="pt-8 pb-6 px-8 text-center bg-white relative">
+          <button
+            onClick={() => navigate('/')}
+            className="absolute left-6 top-6 p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+            aria-label="Back to home"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
           <div className="flex justify-center mb-6">
             <div className={`p-3 rounded-2xl ${userType === 'patient' ? 'bg-blue-50' : 'bg-teal-50'} transition-colors duration-300`}>
               <img src="/logo.png" alt="Gati Logo" className="w-16 h-16 object-contain" />
@@ -177,7 +189,8 @@ const LoginPage = () => {
 
             <button
               onClick={() => setUserType('patient')}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
+              disabled={loading}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'patient'}
               aria-label="Select Patient login"
             >
@@ -186,7 +199,8 @@ const LoginPage = () => {
             </button>
             <button
               onClick={() => setUserType('doctor')}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'}`}
+              disabled={loading}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'doctor'}
               aria-label="Select Doctor login"
             >
@@ -213,6 +227,7 @@ const LoginPage = () => {
                   autoComplete="email"
                   ringColor={ringColor}
                   textColor={textColor}
+                  disabled={loading}
                 />
 
                 <div>
@@ -227,12 +242,14 @@ const LoginPage = () => {
                     autoComplete="current-password"
                     ringColor={ringColor}
                     textColor={textColor}
+                    disabled={loading}
                   />
                   <div className="text-right mt-1.5">
                     <button
                       type="button"
                       onClick={() => setAuthMode('forgot')}
-                      className={`text-xs font-bold ${textColor} hover:opacity-80 transition-opacity`}
+                      disabled={loading}
+                      className={`text-xs font-bold ${textColor} hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       Forgot Password?
                     </button>
@@ -266,7 +283,8 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98]"
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
                   aria-label="Sign in with Google"
                 >
                   <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
@@ -275,7 +293,8 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setAuthMode('phone')}
-                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98]"
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
                 >
                   <Activity className="w-5 h-5 text-slate-400" />
                   <span className="text-sm">Phone</span>
@@ -290,7 +309,8 @@ const LoginPage = () => {
               <button
                 type="button"
                 onClick={resetToEmail}
-                className={`flex items-center gap-2 text-sm font-bold ${textColor} hover:opacity-80`}
+                disabled={loading}
+                className={`flex items-center gap-2 text-sm font-bold ${textColor} hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Login
@@ -314,6 +334,7 @@ const LoginPage = () => {
                       autoComplete="tel"
                       ringColor={ringColor}
                       textColor={textColor}
+                      disabled={loading}
                     />
                     <div id="recaptcha-container" className="flex justify-center"></div>
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
@@ -337,6 +358,7 @@ const LoginPage = () => {
                       autoComplete="one-time-code"
                       ringColor={ringColor}
                       textColor={textColor}
+                      disabled={loading}
                     />
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
                     <PrimaryButton loading={loading} text="Verify & Login" bgColor={bgColor} bgHoverColor={bgHoverColor} />
@@ -362,6 +384,7 @@ const LoginPage = () => {
                       autoComplete="email"
                       ringColor={ringColor}
                       textColor={textColor}
+                      disabled={loading}
                     />
                     {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
                     <PrimaryButton loading={loading} text="Send Recovery Link" bgColor={bgColor} bgHoverColor={bgHoverColor} />
@@ -373,7 +396,7 @@ const LoginPage = () => {
                     </div>
                     <h3 className="text-lg font-bold text-slate-900 mb-2">Check your inbox</h3>
                     <p className="text-slate-500 text-sm mb-6">{success}</p>
-                    <button onClick={resetToEmail} className={`w-full py-3 rounded-xl font-bold text-white ${bgColor} ${bgHoverColor}`}>Return to Login</button>
+                    <button onClick={resetToEmail} disabled={loading} className={`w-full py-3 rounded-xl font-bold text-white ${bgColor} ${bgHoverColor} disabled:opacity-50 disabled:cursor-not-allowed`}>Return to Login</button>
                   </div>
                 )
               )}
@@ -382,7 +405,7 @@ const LoginPage = () => {
 
           {/* Quick Demo Link */}
           <div className="mt-8 text-center">
-            <button onClick={fillDemoCredentials} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors" aria-label="Fill form with demo credentials for testing">
+            <button onClick={fillDemoCredentials} disabled={loading} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Fill form with demo credentials for testing">
               Activate Demo Credentials
             </button>
           </div>

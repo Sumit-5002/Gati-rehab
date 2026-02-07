@@ -6,7 +6,7 @@ A premium Progressive Web Application (PWA) for remote physical therapy using st
 
 Gati is a sophisticated rehabilitation platform that transforms smartphone cameras into clinical-grade assessment tools. Using MediaPipe AI, it provides real-time biomechanical feedback, range-of-motion (ROM) tracking, and form quality scoring.
 
-**Live Project**: `https://gati-rehab.web.app` (Production environment)
+**Live Project**: `https://gati.web.app` (Production environment)
 
 ## 🚀 Tech Stack
 

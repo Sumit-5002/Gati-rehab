@@ -31,7 +31,7 @@ import {
   subscribeToDoctorPatients,
   getAdherenceTrendData,
   getFormQualityTrendData,
-  getROMTrendData
+  getROMTrendData,
 } from '../services/doctorService';
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
@@ -83,27 +83,28 @@ const DoctorDashboard = () => {
   useEffect(() => {
     if (!user || userData?.userType !== 'doctor') return;
 
-    const unsubscribe = subscribeToDoctorPatients(user.uid, (updatedPatients) => {
+    // 1. Listen for patient updates
+    const unsubscribe = subscribeToDoctorPatients(user.uid, async (updatedPatients) => {
       setPatients(updatedPatients);
       setLoading(false);
-    });
 
-    const fetchCharts = async () => {
+      // 2. Pass the fresh data to charts immediately (Fixes Point 2 & 3)
+      // This prevents re-fetching the patients inside the chart functions
       try {
+        setChartsLoading(true);
         const [adherence, quality, rom] = await Promise.all([
-          getAdherenceTrendData(user.uid),
-          getFormQualityTrendData(user.uid),
-          getROMTrendData(user.uid),
+          getAdherenceTrendData(user.uid, updatedPatients),
+          getFormQualityTrendData(user.uid, updatedPatients),
+          getROMTrendData(user.uid, updatedPatients),
         ]);
         setChartData({ adherenceTrend: adherence, formQualityTrend: quality, romTrend: rom });
-        setChartsLoading(false);
       } catch (err) {
         console.error('Error fetching charts:', err);
+      } finally {
         setChartsLoading(false);
       }
-    };
+    });
 
-    fetchCharts();
     return () => unsubscribe();
   }, [user, userData]);
 

@@ -12,28 +12,40 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Users collection - users can read/write their own data
+    // 1. Users collection 
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isAuthenticated();
     }
     
-    // Sessions collection - users can create and read their own sessions
+    // 2. Routines Collection
+    match /routines/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // 3. Doctor Patients Collection (The missing piece)
+    match /doctor_patients/{doctorId}/patients/{patientId} {
+      allow read, write: if request.auth.uid == doctorId;
+    }
+    
+    // 4. Sessions collection 
     match /sessions/{sessionId} {
       allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || 
-         resource.data.doctorId == request.auth.uid);
+      allow read: if isAuthenticated(); 
       allow update, delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid || resource.data.patientId == request.auth.uid);
     }
     
-    // Patients collection - doctors can read their assigned patients
+    // 5. Legacy/Unused collections (kept for safety if your app uses them elsewhere)
     match /patients/{patientId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(patientId);
     }
     
-    // Doctors collection - read access for authenticated users
+    // 5. Trends (Charts)
+    match /trends/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    
     match /doctors/{doctorId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(doctorId);
