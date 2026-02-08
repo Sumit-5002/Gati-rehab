@@ -27,11 +27,10 @@ import NavHeader from '../../../shared/components/NavHeader';
 import SessionReport from '../components/SessionReport';
 import PainLoggerModal from '../components/modals/PainLoggerModal';
 import PatientSettingsModal from '../components/modals/PatientSettingsModal';
-import ScheduleModal from '../components/modals/ScheduleModal';
-import TrendsModal from '../components/modals/TrendsModal';
-import PatientChatModal from '../components/modals/PatientChatModal';
-import PlanOverviewModal from '../components/modals/PlanOverviewModal';
-import PainTracker from '../components/PainTracker';
+import NeuralChatModal from '../../doctor/components/modals/NeuralChatModal';
+import AppointmentModal from '../../../shared/components/modals/AppointmentModal';
+import VideoConsultationModal from '../../../shared/components/modals/VideoConsultationModal';
+import MedicationReminders from '../components/MedicationReminders';
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
 import {
@@ -59,11 +58,9 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [painModalOpen, setPainModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [trendsOpen, setTrendsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
-  const [hasNotifications, setHasNotifications] = useState(true);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   const handlePhysioLink = () => navigate('/patient/physio-link');
   const handleReports = () => navigate('/patient/reports');
@@ -317,6 +314,20 @@ const PatientDashboard = () => {
               <div className="relative z-10">
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-6 sm:mb-8">Daily Roadmap</h3>
                 <div className="space-y-6">
+                  <div
+                    onClick={() => navigate('/visuals')}
+                    className="flex items-center gap-5 p-5 rounded-[2rem] bg-blue-50 border border-blue-100 hover:bg-white hover:shadow-xl hover:border-blue-200 transition-all group/item cursor-pointer"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-sm transition-all group-hover/item:scale-110">
+                      <Image className="w-7 h-7 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-blue-800 truncate leading-none mb-1.5">Visual Progress</p>
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Photo Gallery</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-blue-300 group-hover/item:text-blue-500 transition-colors" />
+                  </div>
+
                   {todayRoutine.map((ex, idx) => (
                     <div
                       key={idx}
@@ -358,40 +369,17 @@ const PatientDashboard = () => {
                   onClick={() => setPainModalOpen(true)}
                 />
                 <ActionTile
-                  icon={<History className="w-5 h-5" />}
-                  label="History"
+                  icon={<FileText className="w-5 h-5" />}
+                  label="Reports"
                   color="indigo"
                   onClick={() => navigate('/history')}
                 />
                 <ActionTile
-                  icon={<TrendingUp className="w-5 h-5" />}
-                  label="Trends"
+                  icon={<Calendar className="w-5 h-5" />}
+                  label="Schedule"
                   color="emerald"
-                  onClick={() => setTrendsOpen(true)}
+                  onClick={() => setAppointmentOpen(true)}
                 />
-              </div>
-            </div>
-
-            {/* Medication Reminders */}
-            <div className="bg-white rounded-[2rem] sm:rounded-[3rem] p-8 shadow-2xl shadow-slate-200/50 border border-slate-50">
-              <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                <ShieldCheck className="w-6 h-6 text-blue-500" /> Reminders
-              </h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-4">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Pain Relief</p>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">After Breakfast</p>
-                  </div>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 opacity-60">
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Multivitamin</p>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taken 8:00 AM</p>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -426,6 +414,24 @@ const PatientDashboard = () => {
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[100px] -mr-32 -mt-32"></div>
               <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-600/10 rounded-full blur-[60px] -ml-20 -mb-20"></div>
             </div>
+
+            <MedicationReminders />
+
+            {/* Achievement Widget */}
+            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[3rem] p-10 text-white shadow-2xl shadow-indigo-200">
+              <div className="flex items-center justify-between mb-6">
+                <Award className="w-10 h-10 text-white/50" />
+                <span className="text-xs font-black uppercase tracking-widest bg-white/20 px-4 py-1.5 rounded-full">New Achievement</span>
+              </div>
+              <h3 className="text-2xl font-black mb-2">Steady Surgeon</h3>
+              <p className="text-indigo-100 font-bold text-sm mb-6 opacity-80">You've maintained an A+ quality score for 5 consecutive sessions!</p>
+              <div className="flex items-center -space-x-3">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full bg-white/20 border-2 border-indigo-700 backdrop-blur-md flex items-center justify-center text-[10px] font-black mt-2">🎖️</div>
+                ))}
+                <div className="w-10 h-10 rounded-full bg-white text-indigo-700 flex items-center justify-center text-xs font-black mt-2 shadow-lg">+12</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -448,30 +454,24 @@ const PatientDashboard = () => {
         onSave={handleSettingsUpdate}
       />
 
-      <ScheduleModal
-        isOpen={scheduleOpen}
-        onClose={() => setScheduleOpen(false)}
-        user={{ uid: user?.uid, name: userData?.name }}
-        doctorId={userData?.doctorId}
-      />
-
-      <TrendsModal
-        isOpen={trendsOpen}
-        onClose={() => setTrendsOpen(false)}
-        patientId={user?.uid}
-      />
-
-      <PatientChatModal
+      <NeuralChatModal
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
-        patientName={userData?.name}
+        chatPartnerId={userData?.doctorId}
+        chatPartnerName={userData?.doctorName || 'Your Doctor'}
       />
 
-      <PlanOverviewModal
-        isOpen={planOpen}
-        onClose={() => setPlanOpen(false)}
-        patientData={userData}
-        routine={todayRoutine}
+      <AppointmentModal
+        isOpen={appointmentOpen}
+        onClose={() => setAppointmentOpen(false)}
+        doctorId={userData?.doctorId}
+        doctorName={userData?.doctorName}
+      />
+
+      <VideoConsultationModal
+        isOpen={videoOpen}
+        onClose={() => setVideoOpen(false)}
+        roomName={`GatiRehab_${user?.uid?.substring(0, 8)}`}
       />
     </div>
   );

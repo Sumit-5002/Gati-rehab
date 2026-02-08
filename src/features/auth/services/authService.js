@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../../lib/firebase/config';
+import { logAction } from '../../../shared/services/auditLogger';
 
 // Google Sign-In Provider
 const googleProvider = new GoogleAuthProvider();
@@ -51,6 +52,10 @@ export const loginWithEmail = async (email, password) => {
     }
 
     console.log('[AuthService] Login successful:', userData);
+
+    // Audit log
+    await logAction(user.uid, 'LOGIN', { method: 'email', email: user.email });
+
     return { user, userData };
   } catch (error) {
     console.error('[AuthService] Login error:', error);
@@ -75,6 +80,10 @@ export const signupWithEmail = async (email, password, name, userType) => {
     });
 
     console.log('[AuthService] Signup successful:', user.uid);
+
+    // Audit log
+    await logAction(user.uid, 'SIGNUP', { method: 'email', email, userType });
+
     return { user };
   } catch (error) {
     console.error('[AuthService] Signup error:', error);
@@ -109,6 +118,10 @@ export const loginWithGoogle = async () => {
     }
 
     console.log('[AuthService] Google login successful:', userData);
+
+    // Audit log
+    await logAction(user.uid, 'LOGIN', { method: 'google', email: user.email });
+
     return { user, userData };
   } catch (error) {
     console.error('[AuthService] Google login error:', error);
@@ -182,6 +195,10 @@ export const verifyPhoneOTP = async (confirmationResult, otp) => {
     }
 
     console.log('[AuthService] Phone login successful:', userData);
+
+    // Audit log
+    await logAction(user.uid, 'LOGIN', { method: 'phone', phoneNumber: user.phoneNumber });
+
     return { user, userData };
   } catch (error) {
     console.error('[AuthService] OTP verification error:', error);
@@ -272,13 +289,16 @@ export const updateUserProfile = async (uid, data) => {
   try {
     const userRef = doc(db, 'users', uid);
     // Don't allow updating userType via this method for security
-    // eslint-disable-next-line no-unused-vars
-    const { userType, ...updateData } = data;
+    const { userType: _, ...updateData } = data;
     await updateDoc(userRef, {
       ...updateData,
       updatedAt: serverTimestamp()
     });
     console.log('[AuthService] User profile updated:', uid);
+
+    // Audit log
+    await logAction(uid, 'UPDATE_PROFILE', { fields: Object.keys(updateData) });
+
     return { success: true };
   } catch (error) {
     console.error('[AuthService] Update profile error:', error);

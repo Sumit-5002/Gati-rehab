@@ -1,11 +1,33 @@
 
-import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../../shared/components/ProtectedRoute';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import Trends from '../../features/patient/pages/Trends';
 import PhysioLink from '../../features/patient/pages/PhysioLink';
 import Reports from '../../features/patient/pages/Reports';
+
+// Lazy load pages for performance
+const LandingPage = lazy(() => import('../../features/auth/pages/LandingPage'));
+const LoginPage = lazy(() => import('../../features/auth/pages/LoginPage'));
+const PatientDashboard = lazy(() => import('../../features/patient/pages/PatientDashboard'));
+const PatientProfile = lazy(() => import('../../features/patient/pages/PatientProfile'));
+const ProgressPhotos = lazy(() => import('../../features/patient/pages/ProgressPhotos'));
+const ExerciseHistory = lazy(() => import('../../features/patient/pages/ExerciseHistory'));
+const WorkoutSession = lazy(() => import('../../features/patient/pages/WorkoutSession'));
+const DoctorDashboard = lazy(() => import('../../features/doctor/pages/DoctorDashboard'));
+const PatientDetailView = lazy(() => import('../../features/doctor/pages/PatientDetailView'));
+const AdminDashboard = lazy(() => import('../../features/admin/pages/AdminDashboard'));
+
+// Loading component for Suspense
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-slate-500 font-medium tracking-widest uppercase text-xs">Initializing...</p>
+    </div>
+  </div>
+);
 
 function AppRoutes() {
   const { user, userData, loading } = useAuth();
@@ -23,7 +45,10 @@ function AppRoutes() {
           path="/"
           element={
             user ? (
-              <Navigate to={userData?.userType === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard'} replace />
+            <Navigate to={
+              userData?.userType === 'admin' ? '/admin-dashboard' :
+              userData?.userType === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard'
+            } replace />
             ) : (
               <LandingPage />
             )
@@ -34,7 +59,10 @@ function AppRoutes() {
           path="/login"
           element={
             user ? (
-              <Navigate to={userData?.userType === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard'} replace />
+            <Navigate to={
+              userData?.userType === 'admin' ? '/admin-dashboard' :
+              userData?.userType === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard'
+            } replace />
             ) : (
               <LoginPage />
             )

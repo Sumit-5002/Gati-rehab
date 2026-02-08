@@ -104,9 +104,9 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
 
             {/* Profile & Logout */}
             <div className={`flex items-center gap-2 sm:gap-4 pl-3 sm:pl-6 border-l ${isDark ? 'border-white/10' : 'border-slate-200/60'}`}>
-              <button
+              <div
+                className={`${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100'} flex items-center gap-3 p-1 rounded-xl sm:rounded-2xl border shadow-sm transition-all cursor-pointer hover:border-blue-500/30`}
                 onClick={() => userType === 'patient' && navigate('/profile')}
-                className={`${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100'} flex items-center gap-3 p-1 rounded-xl sm:rounded-2xl border shadow-sm transition-all hover:border-blue-300`}
               >
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl ${isDark ? 'bg-white/5' : 'bg-slate-50'} flex items-center justify-center border ${isDark ? 'border-white/10' : 'border-slate-100'} overflow-hidden`}>
                   {profile?.photoURL ? (

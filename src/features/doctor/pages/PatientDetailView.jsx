@@ -3,19 +3,10 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Calendar, Activity, Mail, Phone, TrendingUp, ClipboardList, Download, MessageSquare, X } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
+import { lazy, Suspense } from 'react';
+import { ArrowLeft, User, Calendar, Activity, Mail, Phone, TrendingUp, ClipboardList } from 'lucide-react';
+const PatientROMProgressChart = lazy(() => import('../components/charts/PatientROMProgressChart'));
+const PatientQualityTrendChart = lazy(() => import('../components/charts/PatientQualityTrendChart'));
 import NavHeader from '../../../shared/components/NavHeader';
 import SessionReport from '../../patient/components/SessionReport';
 import ManagePlanModal from '../components/modals/ManagePlanModal';
@@ -265,28 +256,9 @@ const PatientDetailView = () => {
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Range of Motion Progress
               </h2>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData.rom}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{fontSize: 12}} />
-                    <YAxis label={{ value: 'Degrees', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="rom"
-                      stroke="#3b82f6"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                      activeDot={{ r: 6 }}
-                      name="ROM (Degrees)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading ROM...</div>}>
+                <PatientROMProgressChart data={chartData.rom} />
+              </Suspense>
             </div>
 
             {/* Quality Score Trend */}
@@ -294,27 +266,9 @@ const PatientDetailView = () => {
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Session Quality Trend
               </h2>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.quality}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{fontSize: 12}} />
-                    <YAxis domain={[0, 100]} label={{ value: 'Score %', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="score"
-                      stroke="#8b5cf6"
-                      strokeWidth={2}
-                      fill="#8b5cf6"
-                      fillOpacity={0.1}
-                      name="Quality Score"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading Quality...</div>}>
+                <PatientQualityTrendChart data={chartData.quality} />
+              </Suspense>
             </div>
           </div>
         ) : (

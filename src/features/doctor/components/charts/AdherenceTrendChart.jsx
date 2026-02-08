@@ -48,7 +48,6 @@ const AdherenceTrendChart = ({ data, loading = false }) => {
     );
   }
 
-
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -93,5 +92,19 @@ const AdherenceTrendChart = ({ data, loading = false }) => {
   );
 };
 
+// Custom tooltip
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+        <p className="text-sm font-medium text-gray-900">{payload[0].payload.date}</p>
+        <p className="text-sm text-blue-600 font-semibold mt-1">
+          Adherence: {payload[0].value}%
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default AdherenceTrendChart;

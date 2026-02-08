@@ -1,5 +1,5 @@
 
-import { UserPlus, Calendar, FileText, MessageSquare, ClipboardList, TrendingUp, ChevronRight, Sparkles } from 'lucide-react';
+import { UserPlus, Calendar, FileText, MessageSquare, Video, ChevronRight, Sparkles } from 'lucide-react';
 
 const QuickActionsPanel = ({ onActionClick }) => {
   const actions = [
@@ -29,14 +29,14 @@ const QuickActionsPanel = ({ onActionClick }) => {
       label: 'Neural Engine',
       icon: Sparkles,
       color: 'orange',
-      description: 'AI Clinical Assistant',
+      description: 'Encrypted patient chat',
     },
     {
-      id: 'patient-messages',
-      label: 'Patient Inbox',
-      icon: MessageSquare,
-      color: 'blue',
-      description: 'Direct medical chat',
+      id: 'video-call',
+      label: 'Video Link',
+      icon: Video,
+      color: 'rose',
+      description: 'Start telehealth session',
     }
   ];
 
@@ -46,6 +46,7 @@ const QuickActionsPanel = ({ onActionClick }) => {
       indigo: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-indigo-200',
       emerald: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:shadow-emerald-200',
       orange: 'bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white hover:shadow-orange-200',
+      rose: 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white hover:shadow-rose-200',
     };
     return styles[color] || styles.blue;
   };

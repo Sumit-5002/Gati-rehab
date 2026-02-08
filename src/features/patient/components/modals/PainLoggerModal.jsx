@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
-import { X, Send, Activity, Thermometer, Smile, Meh, Frown, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
-import { logPain } from '../../services/patientService';
+import { useState } from 'react';
+import { X, Activity, Smile, Meh, Frown, Loader2, CheckCircle2 } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../../../lib/firebase/config';
 import { useAuth } from '../../../auth/context/AuthContext';
 
 const PainLoggerModal = ({ isOpen, onClose }) => {
@@ -28,19 +29,22 @@ const PainLoggerModal = ({ isOpen, onClose }) => {
 
         setLoading(true);
         try {
-            await logPain(user.uid, {
+            await addDoc(collection(db, 'pain_logs'), {
+                userId: user.uid,
                 painLevel,
                 location,
                 description,
-                date: new Date().toISOString()
+                timestamp: serverTimestamp()
             });
             setSuccess(true);
             setTimeout(() => {
                 setSuccess(false);
                 onClose();
+                setPainLevel(3);
+                setDescription('');
             }, 2000);
         } catch (error) {
-            console.error('[PainLoggerModal] Failed to log pain:', error);
+            console.error('[PainLogger] Error saving log:', error);
         } finally {
             setLoading(false);
         }

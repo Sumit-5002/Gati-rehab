@@ -24,7 +24,10 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 
     if (allowedRole && userData?.userType !== allowedRole) {
         // Redirect to correct dashboard if role doesn't match
-        const targetDashboard = userData?.userType === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard';
+        let targetDashboard = '/patient-dashboard';
+        if (userData?.userType === 'doctor') targetDashboard = '/doctor-dashboard';
+        if (userData?.userType === 'admin') targetDashboard = '/admin-dashboard';
+
         return <Navigate to={targetDashboard} replace />;
     }
 

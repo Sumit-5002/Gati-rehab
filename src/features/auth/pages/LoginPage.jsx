@@ -98,7 +98,8 @@ const LoginPage = () => {
 
   // Navigation Logic
   const handleAuthRedirect = (userData) => {
-    if (userData?.userType === 'doctor') navigate('/doctor-dashboard');
+    if (userData?.userType === 'admin') navigate('/admin-dashboard');
+    else if (userData?.userType === 'doctor') navigate('/doctor-dashboard');
     else navigate('/patient-dashboard');
   };
 

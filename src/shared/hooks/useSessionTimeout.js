@@ -1,23 +1,23 @@
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 
 /**
- * Hook to automatically log out user after a period of inactivity
+ * Hook to handle session inactivity timeout
  * @param {number} timeoutMs - Timeout in milliseconds (default 30 minutes)
  */
 export const useSessionTimeout = (timeoutMs = 30 * 60 * 1000) => {
   const { user, logout } = useAuth();
-  const timerRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   const resetTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
     if (user) {
-      timerRef.current = setTimeout(() => {
-        console.log('[SessionTimeout] User inactive for 30 minutes. Logging out.');
+      timeoutRef.current = setTimeout(() => {
+        console.log('[SessionTimeout] Inactivity detected. Logging out...');
         logout();
       }, timeoutMs);
     }
@@ -25,14 +25,10 @@ export const useSessionTimeout = (timeoutMs = 30 * 60 * 1000) => {
 
   useEffect(() => {
     if (!user) {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       return;
     }
 
-    // Set initial timer
-    resetTimer();
-
-    // List of events to listen for
     const events = [
       'mousedown',
       'mousemove',
@@ -42,19 +38,21 @@ export const useSessionTimeout = (timeoutMs = 30 * 60 * 1000) => {
       'click'
     ];
 
+    const handleEvent = () => resetTimer();
+
+    // Set initial timer
+    resetTimer();
+
     // Add event listeners
     events.forEach(event => {
-      window.addEventListener(event, resetTimer);
+      window.addEventListener(event, handleEvent);
     });
 
-    // Cleanup
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       events.forEach(event => {
-        window.removeEventListener(event, resetTimer);
+        window.removeEventListener(event, handleEvent);
       });
     };
   }, [user, resetTimer]);
 };
-
-export default useSessionTimeout;
