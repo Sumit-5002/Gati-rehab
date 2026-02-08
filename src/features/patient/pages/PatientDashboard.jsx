@@ -27,6 +27,9 @@ import NavHeader from '../../../shared/components/NavHeader';
 import SessionReport from '../components/SessionReport';
 import PainLoggerModal from '../components/modals/PainLoggerModal';
 import PatientSettingsModal from '../components/modals/PatientSettingsModal';
+import NeuralChatModal from '../../doctor/components/modals/NeuralChatModal';
+import AppointmentModal from '../../../shared/components/modals/AppointmentModal';
+import VideoConsultationModal from '../../../shared/components/modals/VideoConsultationModal';
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
 import {
@@ -53,6 +56,9 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [painModalOpen, setPainModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   const handleSettingsUpdate = async (data) => {
     try {
@@ -250,7 +256,10 @@ const PatientDashboard = () => {
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-none mb-2">Performance History</h2>
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Your recovery path records</p>
                 </div>
-                <button className="flex items-center gap-2 text-blue-600 font-black text-xs group text-left">
+                <button
+                  onClick={() => navigate('/history')}
+                  className="flex items-center gap-2 text-blue-600 font-black text-xs group text-left"
+                >
                   Full Analytics History <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </div>
@@ -314,15 +323,30 @@ const PatientDashboard = () => {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">Quick Access Laboratory</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-4">
-                <ActionTile icon={<Video className="w-5 h-5" />} label="Physio Link" color="blue" />
+                <ActionTile
+                  icon={<Video className="w-5 h-5" />}
+                  label="Physio Link"
+                  color="blue"
+                  onClick={() => setVideoOpen(true)}
+                />
                 <ActionTile
                   icon={<Plus className="w-5 h-5" />}
                   label="Log Pain"
                   color="rose"
                   onClick={() => setPainModalOpen(true)}
                 />
-                <ActionTile icon={<FileText className="w-5 h-5" />} label="Reports" color="indigo" />
-                <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends" color="emerald" />
+                <ActionTile
+                  icon={<FileText className="w-5 h-5" />}
+                  label="Reports"
+                  color="indigo"
+                  onClick={() => navigate('/history')}
+                />
+                <ActionTile
+                  icon={<Calendar className="w-5 h-5" />}
+                  label="Schedule"
+                  color="emerald"
+                  onClick={() => setAppointmentOpen(true)}
+                />
               </div>
             </div>
 
@@ -344,7 +368,10 @@ const PatientDashboard = () => {
                     "Your knee extension speed improved by <span className="text-blue-400 font-black">15%</span> yesterday. Maintain this velocity for better adherence."
                   </p>
                   <div className="pt-4 border-t border-white/10">
-                    <button className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 group">
+                    <button
+                      onClick={() => setChatOpen(true)}
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 group"
+                    >
                       <MessageSquare className="w-4 h-4" /> Chat with AI Assistant <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </button>
                   </div>
@@ -390,6 +417,26 @@ const PatientDashboard = () => {
         onClose={() => setSettingsOpen(false)}
         patientProfile={userData}
         onSave={handleSettingsUpdate}
+      />
+
+      <NeuralChatModal
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        chatPartnerId={userData?.doctorId}
+        chatPartnerName={userData?.doctorName || 'Your Doctor'}
+      />
+
+      <AppointmentModal
+        isOpen={appointmentOpen}
+        onClose={() => setAppointmentOpen(false)}
+        doctorId={userData?.doctorId}
+        doctorName={userData?.doctorName}
+      />
+
+      <VideoConsultationModal
+        isOpen={videoOpen}
+        onClose={() => setVideoOpen(false)}
+        roomName={`GatiRehab_${user?.uid?.substring(0, 8)}`}
       />
     </div>
   );

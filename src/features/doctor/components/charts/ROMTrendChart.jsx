@@ -33,23 +33,6 @@ const ROMTrendChart = ({ data, loading = false }) => {
     );
   }
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-          <p className="text-sm font-medium text-gray-900 mb-2">{payload[0].payload.date}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-xs" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}°
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -115,6 +98,23 @@ const ROMTrendChart = ({ data, loading = false }) => {
       </ResponsiveContainer>
     </div>
   );
+};
+
+// Custom tooltip
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+        <p className="text-sm font-medium text-gray-900 mb-2">{payload[0].payload.date}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-xs" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}°
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
 };
 
 export default ROMTrendChart;

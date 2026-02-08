@@ -7,10 +7,10 @@ import {
   getDocs,
   onSnapshot,
   setDoc,
-  serverTimestamp,
-  documentId 
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
+import { logAction } from '../../../shared/services/auditLogger';
 
 /**
  * Get all patients assigned to a doctor
@@ -312,7 +312,7 @@ export const getFormQualityTrendData = async (doctorId, existingPatients = null)
  * Get ROM trend data for charts (last 4 weeks)
  * FIX: Accepts 'existingPatients' to avoid re-fetching (Fixes Point 2)
  */
-export const getROMTrendData = async (doctorId, existingPatients = null) => {
+export const getROMTrendData = async (doctorId, _existingPatients = null) => {
   try {
     // Even if ROM data is mocked, we accept the arg for consistency
     const last4Weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
@@ -352,6 +352,9 @@ export const addPatientToDoctor = async (doctorId, patientData) => {
       active: true
     });
 
+    // Audit log
+    await logAction(doctorId, 'ADD_PATIENT', { patientId, patientName: patientData.name });
+
     return { id: patientId, success: true };
   } catch (error) {
     console.error('[DoctorService] Add patient error:', error);
@@ -382,6 +385,10 @@ export const updatePatientRoutine = async (patientId, routineData) => {
       updatedAt: serverTimestamp(),
     }, { merge: true });
     
+    // Audit log - We don't have the doctor's UID here easily unless we pass it,
+    // but we can at least log the action on the patient
+    await logAction(patientId, 'UPDATE_ROUTINE', { updatedBy: 'doctor' });
+
     return { success: true };
   } catch (error) {
     console.error('[DoctorService] Update routine error:', error);

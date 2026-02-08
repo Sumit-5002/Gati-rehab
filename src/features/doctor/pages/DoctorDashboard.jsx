@@ -17,16 +17,19 @@ import {
   ChevronRight,
   Target
 } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import NavHeader from '../../../shared/components/NavHeader';
 import PatientCard from '../components/PatientCard';
-import AdherenceTrendChart from '../components/charts/AdherenceTrendChart';
-import FormQualityChart from '../components/charts/FormQualityChart';
-import ROMTrendChart from '../components/charts/ROMTrendChart';
+const AdherenceTrendChart = lazy(() => import('../components/charts/AdherenceTrendChart'));
+const FormQualityChart = lazy(() => import('../components/charts/FormQualityChart'));
+const ROMTrendChart = lazy(() => import('../components/charts/ROMTrendChart'));
 import SettingsModal from '../components/modals/SettingsModal';
 import QuickActionsPanel from '../components/QuickActionsPanel';
 import DoctorProfileCard from '../components/DoctorProfileCard';
 import AddPatientModal from '../components/modals/AddPatientModal';
 import NeuralChatModal from '../components/modals/NeuralChatModal';
+import AppointmentModal from '../../../shared/components/modals/AppointmentModal';
+import VideoConsultationModal from '../../../shared/components/modals/VideoConsultationModal';
 import {
   subscribeToDoctorPatients,
   getAdherenceTrendData,
@@ -49,7 +52,7 @@ const DoctorDashboard = () => {
   };
 
   const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [_, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAdherence, setFilterAdherence] = useState('all');
   const [stats, setStats] = useState({
@@ -67,6 +70,8 @@ const DoctorDashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
 
   const handleActionClick = (id) => {
@@ -74,6 +79,10 @@ const DoctorDashboard = () => {
       setAddPatientOpen(true);
     } else if (id === 'messages') {
       setChatOpen(true);
+    } else if (id === 'schedule') {
+      setAppointmentOpen(true);
+    } else if (id === 'video-call') {
+      setVideoOpen(true);
     } else {
       console.log(`Action ${id} not implemented yet`);
     }
@@ -215,18 +224,22 @@ const DoctorDashboard = () => {
                   <button className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-slate-600 flex-1 sm:flex-none">Monthly</button>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-4">
-                  <AdherenceTrendChart data={chartData.adherenceTrend} loading={chartsLoading} />
+              <Suspense fallback={<div className="h-64 flex items-center justify-center bg-slate-50 rounded-2xl animate-pulse text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Analytics...</div>}>
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="space-y-4">
+                    <AdherenceTrendChart data={chartData.adherenceTrend} loading={chartsLoading} />
+                  </div>
+                  <div className="space-y-4">
+                    <FormQualityChart data={chartData.formQualityTrend} loading={chartsLoading} />
+                  </div>
                 </div>
-                <div className="space-y-4">
-                  <FormQualityChart data={chartData.formQualityTrend} loading={chartsLoading} />
-                </div>
-              </div>
+              </Suspense>
             </div>
 
             <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-50">
-              <ROMTrendChart data={chartData.romTrend} loading={chartsLoading} />
+              <Suspense fallback={<div className="h-64 flex items-center justify-center bg-slate-50 rounded-2xl animate-pulse text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Biometrics...</div>}>
+                <ROMTrendChart data={chartData.romTrend} loading={chartsLoading} />
+              </Suspense>
             </div>
 
             {/* Patient List Section */}
@@ -326,7 +339,10 @@ const DoctorDashboard = () => {
                 <AppointmentRow name="Amit Patel" time="16:00 PM" type="In-person" />
                 <AppointmentRow name="Rajesh Kumar" time="Tomorrow" type="Follow-up" />
               </div>
-              <button className="w-full mt-6 py-3 bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors rounded-xl font-bold flex items-center justify-center gap-2">
+              <button
+                onClick={() => setAppointmentOpen(true)}
+                className="w-full mt-6 py-3 bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors rounded-xl font-bold flex items-center justify-center gap-2"
+              >
                 Open Calendar <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -356,6 +372,17 @@ const DoctorDashboard = () => {
       <NeuralChatModal
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+      />
+
+      <AppointmentModal
+        isOpen={appointmentOpen}
+        onClose={() => setAppointmentOpen(false)}
+      />
+
+      <VideoConsultationModal
+        isOpen={videoOpen}
+        onClose={() => setVideoOpen(false)}
+        roomName={`GatiClinic_Doctor_${user?.uid?.substring(0, 8)}`}
       />
     </div>
   );
