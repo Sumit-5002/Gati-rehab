@@ -41,6 +41,7 @@ const WorkoutSession = () => {
   const frameDataRef = useRef([]); // Use ref for high-frequency data to avoid re-renders
   const [realTimeFeedback, setRealTimeFeedback] = useState(null);
   const [isDevMode, setIsDevMode] = useState(location.state?.devMode || false);
+  const [frameData, setFrameData] = useState([]);
 
   const availableExercises = Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
     id,
@@ -52,11 +53,11 @@ const WorkoutSession = () => {
   const angleHistoryRef = useRef([]);
 
   const updateQualityScore = useCallback(() => {
-    if (frameData.length > 0) {
-      const quality = calculateFormQualityScore(frameData, currentExercise);
+    if (frameDataRef.current.length > 0) {
+      const quality = calculateFormQualityScore(frameDataRef.current, currentExercise);
       setFormQuality(quality.overallScore);
     }
-  }, [frameData, currentExercise]);
+  }, [currentExercise]);
 
   // Detect when a rep is completed
   const detectRepCompletion = useCallback((angles) => {
@@ -94,10 +95,13 @@ const WorkoutSession = () => {
     const { angles, feedback: rtFeedback, timestamp } = poseData;
 
     // Store frame data for later analysis (limited to prevent memory issues)
-    setFrameData(prev => {
-      const newData = [...prev, { angles, timestamp, feedback: rtFeedback }];
-      return newData.slice(-1000); // Keep last 1000 frames for scoring
-    });
+    // Store frame data for later analysis
+    frameDataRef.current = [...frameDataRef.current, { angles, timestamp, feedback: rtFeedback }].slice(-1000);
+
+    // Periodically update state for UI elements that might need it, but keep it minimal
+    if (frameDataRef.current.length % 10 === 0) {
+      setFrameData(frameDataRef.current);
+    }
 
     // Update current angle (knee angle for knee-bends)
     const primaryAngle = angles.leftKnee || angles.rightKnee || 0;

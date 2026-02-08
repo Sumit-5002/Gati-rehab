@@ -343,6 +343,7 @@ export const addPatientToDoctor = async (doctorId, patientData) => {
     await setDoc(doc(db, 'users', patientId), {
       ...patientData,
       userType: 'patient',
+      doctorId: doctorId, // Link the doctor to the patient
       createdAt: serverTimestamp(),
       adherenceRate: 0,
       completedSessions: 0,
@@ -384,7 +385,7 @@ export const updatePatientRoutine = async (patientId, routineData) => {
       ...routineData,
       updatedAt: serverTimestamp(),
     }, { merge: true });
-    
+
     return { success: true };
   } catch (error) {
     console.error('[DoctorService] Update routine error:', error);

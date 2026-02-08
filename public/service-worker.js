@@ -9,15 +9,8 @@ const API_CACHE = 'gati-api-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/src/main.jsx',
-  '/src/App.jsx',
-  '/src/index.css',
   '/logo.png',
   '/manifest.json',
-  // Critical CSS and JS for offline functionality
-  '/src/shared/components/NavHeader.jsx',
-  '/src/shared/components/PWAInstallPrompt.jsx',
-  '/src/features/auth/context/AuthContext.jsx',
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm/vision_wasm_internal.wasm',
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
 ];
@@ -75,6 +68,15 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Skip Vite HMR and dev scripts
+  if (event.request.url.includes('node_modules') ||
+    event.request.url.includes('@vite') ||
+    event.request.url.includes('/src/') ||
+    event.request.url.includes('?v=') ||
+    event.request.url.includes('token=')) {
     return;
   }
 

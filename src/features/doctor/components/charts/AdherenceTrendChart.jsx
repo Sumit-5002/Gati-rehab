@@ -62,26 +62,26 @@ const AdherenceTrendChart = ({ data, loading = false }) => {
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-          <XAxis 
-            dataKey="date" 
+          <XAxis
+            dataKey="date"
             tick={{ fontSize: 12, fill: '#6B7280' }}
             stroke="#D1D5DB"
           />
-          <YAxis 
+          <YAxis
             tick={{ fontSize: 12, fill: '#6B7280' }}
             stroke="#D1D5DB"
             domain={[0, 100]}
             label={{ value: 'Adherence %', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#6B7280' } }}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend 
+          <Legend
             wrapperStyle={{ fontSize: 12 }}
             iconType="line"
           />
-          <Line 
-            type="monotone" 
-            dataKey="adherence" 
-            stroke="#3B82F6" 
+          <Line
+            type="monotone"
+            dataKey="adherence"
+            stroke="#3B82F6"
             strokeWidth={3}
             dot={{ fill: '#3B82F6', r: 4 }}
             activeDot={{ r: 6 }}
@@ -93,19 +93,5 @@ const AdherenceTrendChart = ({ data, loading = false }) => {
   );
 };
 
-// Custom tooltip
-const CustomTooltip = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-        <p className="text-sm font-medium text-gray-900">{payload[0].payload.date}</p>
-        <p className="text-sm text-blue-600 font-semibold mt-1">
-          Adherence: {payload[0].value}%
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
 
 export default AdherenceTrendChart;

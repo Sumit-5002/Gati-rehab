@@ -29,6 +29,9 @@ import SessionReport from '../components/SessionReport';
 import PainLoggerModal from '../components/modals/PainLoggerModal';
 import PatientSettingsModal from '../components/modals/PatientSettingsModal';
 import ScheduleModal from '../components/modals/ScheduleModal';
+import TrendsModal from '../components/modals/TrendsModal';
+import PatientChatModal from '../components/modals/PatientChatModal';
+import PlanOverviewModal from '../components/modals/PlanOverviewModal';
 import PainTracker from '../components/PainTracker';
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
@@ -57,6 +60,9 @@ const PatientDashboard = () => {
   const [painModalOpen, setPainModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [trendsOpen, setTrendsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
 
   const handleSettingsUpdate = async (data) => {
@@ -148,7 +154,7 @@ const PatientDashboard = () => {
               <Terminal className="w-4 h-4 text-blue-400" />
               <span className="text-xs uppercase tracking-widest">Neural Lab</span>
             </button>
-            <button 
+            <button
               className="bg-white p-4 rounded-2xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-lg active:scale-90 relative"
               aria-label="View notifications"
               onClick={() => setHasNotifications(false)}
@@ -192,7 +198,8 @@ const PatientDashboard = () => {
                       </div>
                       <span className="text-base sm:text-lg">Resume Program</span>
                     </button>
-                    <button 
+                    <button
+                      onClick={() => setPlanOpen(true)}
                       className="px-8 py-4.5 sm:py-5 rounded-2xl sm:rounded-[2rem] font-black bg-white/5 border border-white/10 hover:bg-white/10 transition-all backdrop-blur-xl text-sm sm:text-base"
                       aria-label="View treatment plan overview"
                     >
@@ -300,7 +307,11 @@ const PatientDashboard = () => {
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-6 sm:mb-8">Daily Roadmap</h3>
                 <div className="space-y-6">
                   {todayRoutine.map((ex, idx) => (
-                    <div key={idx} className="flex items-center gap-5 p-5 rounded-[2rem] bg-slate-50/50 border border-slate-100/50 hover:bg-white hover:shadow-xl hover:border-blue-100 transition-all group/item">
+                    <div
+                      key={idx}
+                      onClick={() => navigate('/workout', { state: { exerciseIndex: idx } })}
+                      className="flex items-center gap-5 p-5 rounded-[2rem] bg-slate-50/50 border border-slate-100/50 hover:bg-white hover:shadow-xl hover:border-blue-100 transition-all group/item cursor-pointer"
+                    >
                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-all group-hover/item:scale-110 ${ex.completed ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400'}`}>
                         {ex.completed ? <CheckCircle className="w-7 h-7" /> : <Play className="w-5 h-5 ml-1" />}
                       </div>
@@ -346,7 +357,12 @@ const PatientDashboard = () => {
                   color="indigo"
                   onClick={() => navigate('/history')}
                 />
-                <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends" color="emerald" />
+                <ActionTile
+                  icon={<TrendingUp className="w-5 h-5" />}
+                  label="Trends"
+                  color="emerald"
+                  onClick={() => setTrendsOpen(true)}
+                />
               </div>
             </div>
 
@@ -391,7 +407,10 @@ const PatientDashboard = () => {
                     "Your knee extension speed improved by <span className="text-blue-400 font-black">15%</span> yesterday. Maintain this velocity for better adherence."
                   </p>
                   <div className="pt-4 border-t border-white/10">
-                    <button className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 group">
+                    <button
+                      onClick={() => setChatOpen(true)}
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 group"
+                    >
                       <MessageSquare className="w-4 h-4" /> Chat with AI Assistant <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </button>
                   </div>
@@ -405,9 +424,9 @@ const PatientDashboard = () => {
         </div>
 
         <div className="mt-16 mb-4 text-center">
-           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest opacity-60">
-             Measurements are approximate and intended for rehabilitation guidance only
-           </p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest opacity-60">
+            Measurements are approximate and intended for rehabilitation guidance only
+          </p>
         </div>
       </main>
 
@@ -428,6 +447,25 @@ const PatientDashboard = () => {
         onClose={() => setScheduleOpen(false)}
         user={{ uid: user?.uid, name: userData?.name }}
         doctorId={userData?.doctorId}
+      />
+
+      <TrendsModal
+        isOpen={trendsOpen}
+        onClose={() => setTrendsOpen(false)}
+        patientId={user?.uid}
+      />
+
+      <PatientChatModal
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        patientName={userData?.name}
+      />
+
+      <PlanOverviewModal
+        isOpen={planOpen}
+        onClose={() => setPlanOpen(false)}
+        patientData={userData}
+        routine={todayRoutine}
       />
     </div>
   );

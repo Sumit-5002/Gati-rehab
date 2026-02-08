@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, User, ArrowLeft, Activity, Stethoscope } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft, Activity, Stethoscope, Eye, EyeOff } from 'lucide-react';
 import {
   loginWithEmail,
   signupWithEmail,

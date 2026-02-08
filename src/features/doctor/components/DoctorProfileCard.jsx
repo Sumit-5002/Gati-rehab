@@ -1,7 +1,7 @@
 
 import { User, Mail, Phone, Briefcase, MapPin, Calendar, Award, Star, ExternalLink, Users } from 'lucide-react';
 
-const DoctorProfileCard = ({ doctorProfile }) => {
+const DoctorProfileCard = ({ doctorProfile, onEditClick }) => {
   if (!doctorProfile) {
     return (
       <div className="bg-slate-900 rounded-[3rem] p-10 animate-pulse">
@@ -67,7 +67,10 @@ const DoctorProfileCard = ({ doctorProfile }) => {
           </div>
         </div>
 
-        <button className="w-full mt-10 py-5 bg-white text-slate-900 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-xl">
+        <button
+          onClick={onEditClick}
+          className="w-full mt-10 py-5 bg-white text-slate-900 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-xl active:scale-95"
+        >
           Edit Full Profile <ExternalLink className="w-4 h-4" />
         </button>
       </div>

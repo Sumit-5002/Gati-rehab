@@ -1,12 +1,13 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { X, Send, User, Bot, Sparkles, MessageSquare, ShieldCheck } from 'lucide-react';
+import { getGeminiResponse } from '../../../../shared/services/geminiService';
 
 const NeuralChatModal = ({ isOpen, onClose }) => {
     const [messages, setMessages] = useState([
-        { id: 1, text: "Hello Dr. Gati's Neural Assistant here. How can I help you analyze patient progress today?", sender: 'ai', time: '10:00 AM' }
+        { id: 1, text: "Hello! Dr. Gati's Neural Assistant powered by Gemini is active. How can I help you analyze patient progress today?", sender: 'ai', time: '10:00 AM' }
     ]);
     const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -17,24 +18,41 @@ const NeuralChatModal = ({ isOpen, onClose }) => {
         scrollToBottom();
     }, [messages]);
 
-    const handleSend = (e) => {
+    const handleSend = async (e) => {
         e.preventDefault();
-        if (!input.trim()) return;
+        if (!input.trim() || isTyping) return;
 
-        const userMsg = { id: Date.now(), text: input, sender: 'doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-        setMessages(prev => [...prev, userMsg]);
+        const userMsgText = input;
+        const userMsgHtml = { id: Date.now(), text: userMsgText, sender: 'doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+
+        setMessages(prev => [...prev, userMsgHtml]);
         setInput('');
+        setIsTyping(true);
 
-        // Simulate AI response
-        setTimeout(() => {
+        try {
+            // Get history for context (excluding the first welcome message if preferred, or include all)
+            const history = messages.slice(1);
+
+            const aiResponseText = await getGeminiResponse(userMsgText, history);
+
             const aiMsg = {
                 id: Date.now() + 1,
-                text: "Analyzing clinical data... Rajesh Kumar's adherence is trended upwards by 12% following the adjustments you made to his routine last week.",
+                text: aiResponseText,
                 sender: 'ai',
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             setMessages(prev => [...prev, aiMsg]);
-        }, 1500);
+        } catch (error) {
+            const errorMsg = {
+                id: Date.now() + 2,
+                text: "I'm having trouble connecting to my neural network. " + (error.message.includes("API Key") ? "Please check if your Gemini API Key is configured." : "Please try again in a moment."),
+                sender: 'ai',
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -76,8 +94,8 @@ const NeuralChatModal = ({ isOpen, onClose }) => {
                                     {msg.sender === 'doctor' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-slate-500" />}
                                 </div>
                                 <div className={`p-4 rounded-[1.5rem] shadow-sm text-sm font-bold leading-relaxed ${msg.sender === 'doctor'
-                                        ? 'bg-blue-600 text-white rounded-tr-none'
-                                        : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
+                                    ? 'bg-blue-600 text-white rounded-tr-none'
+                                    : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
                                     }`}>
                                     {msg.text}
                                     <p className={`text-[9px] mt-2 opacity-60 ${msg.sender === 'doctor' ? 'text-right' : ''}`}>

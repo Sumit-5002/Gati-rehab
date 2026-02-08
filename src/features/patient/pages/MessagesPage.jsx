@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/context/AuthContext';
 import NavHeader from '../../../shared/components/NavHeader';
 import ChatWindow from '../../shared/components/ChatWindow';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
 
 const PatientMessagesPage = () => {
@@ -21,12 +21,11 @@ const PatientMessagesPage = () => {
       }
 
       try {
-        const docRef = collection(db, 'users');
-        const q = query(docRef, where('uid', '==', userData.doctorId));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const d = snap.docs[0].data();
-          setAssignedDoctor({ uid: d.uid, name: d.name });
+        const docRef = doc(db, 'users', userData.doctorId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const d = snap.data();
+          setAssignedDoctor({ uid: snap.id, name: d.name });
         }
       } catch (error) {
         console.error('Error fetching doctor:', error);

@@ -27,6 +27,8 @@ import QuickActionsPanel from '../components/QuickActionsPanel';
 import DoctorProfileCard from '../components/DoctorProfileCard';
 import AddPatientModal from '../components/modals/AddPatientModal';
 import NeuralChatModal from '../components/modals/NeuralChatModal';
+import ReportsModal from '../components/modals/ReportsModal';
+import SchedulerModal from '../components/modals/SchedulerModal';
 import {
   subscribeToDoctorPatients,
   getAdherenceTrendData,
@@ -49,7 +51,7 @@ const DoctorDashboard = () => {
   };
 
   const [patients, setPatients] = useState([]);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAdherence, setFilterAdherence] = useState('all');
   const [stats, setStats] = useState({
@@ -67,13 +69,23 @@ const DoctorDashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
 
   const handleActionClick = (id) => {
     if (id === 'add-patient') {
       setAddPatientOpen(true);
-    } else if (id === 'messages') {
+    } else if (id === 'neural-chat') {
       setChatOpen(true);
+    } else if (id === 'reports') {
+      setReportsOpen(true);
+    } else if (id === 'schedule') {
+      setSchedulerOpen(true);
+    } else if (id === 'patient-messages') {
+      // For now, we'll keep it simple: the doctor clicks a patient to message
+      // but we could navigate to a dedicated inbox later
+      alert("To message a patient, click on their profile in the Patient Directory.");
     } else {
       console.log(`Action ${id} not implemented yet`);
     }
@@ -94,13 +106,14 @@ const DoctorDashboard = () => {
         const [adherence, quality, rom] = await Promise.all([
           getAdherenceTrendData(user.uid, updatedPatients),
           getFormQualityTrendData(user.uid, updatedPatients),
-          getROMTrendData(),
+          getROMTrendData(user.uid),
         ]);
         setChartData({ adherenceTrend: adherence, formQualityTrend: quality, romTrend: rom });
       } catch (err) {
         console.error('Error fetching charts:', err);
       } finally {
         setChartsLoading(false);
+        setLoading(false);
       }
     });
 
@@ -125,6 +138,17 @@ const DoctorDashboard = () => {
       (filterAdherence === 'low' && p.adherenceRate < 60);
     return matchesSearch && matchesFilter;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-teal-600 border-opacity-20 border-t-teal-600"></div>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Accessing Command Center...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F1F5F9]">
@@ -274,7 +298,10 @@ const DoctorDashboard = () => {
 
           {/* Sidebar Area - Stacks on mobile */}
           <div className="lg:col-span-4 space-y-8">
-            <DoctorProfileCard doctorProfile={userData} />
+            <DoctorProfileCard
+              doctorProfile={userData}
+              onEditClick={() => setSettingsOpen(true)}
+            />
 
             <QuickActionsPanel onActionClick={handleActionClick} />
 
@@ -355,6 +382,19 @@ const DoctorDashboard = () => {
       <NeuralChatModal
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+      />
+
+      <ReportsModal
+        isOpen={reportsOpen}
+        onClose={() => setReportsOpen(false)}
+        patients={patients}
+      />
+
+      <SchedulerModal
+        isOpen={schedulerOpen}
+        onClose={() => setSchedulerOpen(false)}
+        doctorId={user?.uid}
+        patients={patients}
       />
     </div>
   );

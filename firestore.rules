@@ -83,5 +83,51 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isOwner(doctorId);
     }
+
+    // 8. Pain Logs collection
+    match /pain_logs/{logId} {
+      allow create: if isAuthenticated() && (
+        isDocOwner(request.resource.data) || isDocDoctor(request.resource.data)
+      );
+      allow read: if isAuthenticated() && (
+        isDocOwner(resource.data) || isDocDoctor(resource.data)
+      );
+      allow update, delete: if isAuthenticated() && (
+        isDocOwner(resource.data) || isDocDoctor(resource.data)
+      );
+    }
+
+    // 9. Appointments collection
+    match /appointments/{appointmentId} {
+      allow create: if isAuthenticated() && (
+        request.resource.data.patientId == request.auth.uid ||
+        isDoctorOf(request.resource.data.patientId)
+      );
+      allow read: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid ||
+        isDoctorOf(resource.data.patientId)
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid
+      );
+    }
+
+    // 10. Messages collection
+    match /messages/{messageId} {
+      allow create: if isAuthenticated() && (
+        request.resource.data.senderId == request.auth.uid ||
+        isDocDoctor(request.resource.data)
+      );
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      );
+    }
   }
 }
