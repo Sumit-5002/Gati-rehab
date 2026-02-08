@@ -242,13 +242,23 @@ export const logPain = async (patientId, painData) => {
 /**
  * Log simple pain level
  */
-export const logPainLevel = async (patientId, level, note = '') => {
+export const logPainLevel = async (patientId, painData) => {
   try {
     const painLogsRef = collection(db, 'pain_logs');
+
+    // Support both old (level, note) and new (object) formats
+    const data = typeof painData === 'object' ? {
+      ...painData,
+      level: parseInt(painData.level),
+      fatigue: parseInt(painData.fatigue || 0),
+      stiffness: parseInt(painData.stiffness || 0)
+    } : {
+      level: parseInt(painData)
+    };
+
     await addDoc(painLogsRef, {
       patientId,
-      level: parseInt(level),
-      note,
+      ...data,
       timestamp: serverTimestamp()
     });
     return { success: true };

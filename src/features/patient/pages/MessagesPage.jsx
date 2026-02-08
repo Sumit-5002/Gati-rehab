@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/context/AuthContext';
 import NavHeader from '../../../shared/components/NavHeader';
 import ChatWindow from '../../shared/components/ChatWindow';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
 
 const PatientMessagesPage = () => {

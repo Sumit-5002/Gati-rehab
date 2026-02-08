@@ -121,6 +121,8 @@ const ExerciseHistory = () => {
           </div>
         </div>
 
+        {painLogs.length > 0 && <PainTrendChart data={painLogs} />}
+
         {filteredSessions.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredSessions.map((session) => (

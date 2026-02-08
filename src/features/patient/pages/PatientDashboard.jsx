@@ -54,8 +54,10 @@ import {
   getTodayRoutine,
   getRecentSessions,
   subscribeToPatientData,
-  subscribeToWeeklySessions
+  subscribeToWeeklySessions,
+  getPainHistory
 } from '../services/patientService';
+import { calculateDailyPlan } from '../engine/rehabEngine';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -70,18 +72,15 @@ const PatientDashboard = () => {
   });
 
   const [todayRoutine, setTodayRoutine] = useState([]);
+  const [aiPlan, setAiPlan] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [painModalOpen, setPainModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [appointmentOpen, setAppointmentOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
-  const [hasNotifications, setHasNotifications] = useState(true);
   const [planOpen, setPlanOpen] = useState(false);
   const [trendsOpen, setTrendsOpen] = useState(false);
-
-  const handleLiveSession = () => setVideoOpen(true);
 
   const handleSettingsUpdate = async (data) => {
     try {
@@ -97,15 +96,29 @@ const PatientDashboard = () => {
 
     const fetchData = async () => {
       try {
-        const [statsData, routineData, sessionsData] = await Promise.all([
+        const [statsData, _, sessionsData, painData] = await Promise.all([
           getPatientStats(user.uid),
           getTodayRoutine(user.uid),
-          getRecentSessions(user.uid, 4)
+          getRecentSessions(user.uid, 4),
+          getPainHistory(user.uid, 5)
         ]);
 
         setStats(statsData);
-        setTodayRoutine(routineData);
         setRecentSessions(sessionsData);
+
+        // Run AI Decision Engine
+        const generatedPlan = calculateDailyPlan(
+          {
+            injuryType: userData?.injuryType || 'General Recovery',
+            rehabPhase: userData?.rehabPhase || 'Mid'
+          },
+          painData,
+          sessionsData
+        );
+
+        setAiPlan(generatedPlan);
+        setTodayRoutine(generatedPlan.exercises);
+
         setLoading(false);
       } catch (error) {
         console.error('[PatientDashboard] Error fetching data:', error);
@@ -134,7 +147,7 @@ const PatientDashboard = () => {
       unsubPatient();
       unsubWeekly();
     };
-  }, [user]);
+  }, [user, userData?.injuryType, userData?.rehabPhase]);
 
   if (loading) {
     return (
@@ -259,17 +272,42 @@ const PatientDashboard = () => {
 
           {/* Daily Roadmap */}
           <div className="bg-white rounded-[2.5rem] p-8 sm:p-12 shadow-xl shadow-slate-200/40 border border-slate-100">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
               <div>
-                <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">Today's Roadmap</h3>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Daily Protocol</p>
+                <div className="flex items-center gap-3 mb-1">
+                  <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">Today's Roadmap</h3>
+                  {aiPlan?.status && (
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${aiPlan.status === 'Progressing' ? 'bg-emerald-100 text-emerald-600' :
+                        aiPlan.status === 'Regressing' ? 'bg-rose-100 text-rose-600' :
+                          'bg-blue-100 text-blue-600'
+                      }`}>
+                      AI: {aiPlan.status}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Personalized Decision-Support Protocol</p>
               </div>
-              {todayRoutine.length > 0 && (
-                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {todayRoutine.filter(ex => ex.completed).length}/{todayRoutine.length} Done
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {todayRoutine.length > 0 && (
+                  <span className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    {todayRoutine.filter(ex => ex.completed).length}/{todayRoutine.length} Done
+                  </span>
+                )}
+              </div>
             </div>
+
+            {aiPlan?.reasoning && (
+              <div className="mb-8 p-5 bg-blue-50/50 rounded-3xl border border-blue-100/50 flex gap-4 items-start">
+                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-200">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-1">AI Decision Logic</p>
+                  <p className="text-sm font-bold text-slate-700 leading-relaxed">{aiPlan.reasoning}</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {todayRoutine.map((ex, idx) => (
                 <div
@@ -409,7 +447,7 @@ const PatientDashboard = () => {
       <PlanOverviewModal
         isOpen={planOpen}
         onClose={() => setPlanOpen(false)}
-        patientData={userData}
+        routine={aiPlan}
       />
 
 

@@ -19,13 +19,10 @@ import {
   ArrowLeft, User, Mail, Phone, ClipboardList, X
 } from 'lucide-react';
 import {
-  serverTimestamp,
   collection,
   onSnapshot,
   query,
-  where,
-  orderBy,
-  limit
+  where
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
 import { lazy, Suspense } from 'react';
@@ -121,7 +118,7 @@ const DoctorDashboard = () => {
         const [adherence, quality, rom] = await Promise.all([
           getAdherenceTrendData(user.uid, updatedPatients),
           getFormQualityTrendData(user.uid, updatedPatients),
-          getROMTrendData(user.uid),
+          getROMTrendData(),
         ]);
         setChartData({ adherenceTrend: adherence, formQualityTrend: quality, romTrend: rom });
       } catch (err) {

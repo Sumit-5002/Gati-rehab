@@ -97,6 +97,7 @@ export const generatePatientReport = async (patientData, format = 'Clinical Summ
         const result = await model.generateContent(prompt);
         return result.response.text();
     } catch (error) {
+        console.error('[GeminiService] Report generation error:', error);
         return "Unable to generate report at this time. Developed by team Heal-gorithms.";
     }
 };

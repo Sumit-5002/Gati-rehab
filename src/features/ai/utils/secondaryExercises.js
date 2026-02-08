@@ -251,35 +251,70 @@ export const AVAILABLE_EXERCISES = {
     name: 'Knee Bends',
     description: 'Bend and straighten your knees',
     difficulty: 'Easy',
+    intensity: 0.3,
+    suitableFor: ['ACL Recovery', 'Knee OA', 'Post-Fracture'],
+    phase: 'Acute',
+    sets: 3,
+    repsPerSet: 10
   },
   'leg-raises': {
     name: 'Leg Raises',
     description: 'Lift your leg while standing',
     difficulty: 'Medium',
+    intensity: 0.5,
+    suitableFor: ['Hip Replacement', 'ACL Recovery'],
+    phase: 'Mid',
+    sets: 3,
+    repsPerSet: 12
   },
   'standing-march': {
     name: 'Standing March',
     description: 'Lift knees alternately while standing',
     difficulty: 'Easy',
+    intensity: 0.4,
+    suitableFor: ['Stroke Recovery', 'General Mobility'],
+    phase: 'Acute',
+    sets: 3,
+    repsPerSet: 20
   },
   'hip-flexion': {
     name: 'Hip Flexion',
     description: 'Flex your hip joint',
     difficulty: 'Easy',
+    intensity: 0.3,
+    suitableFor: ['Hip OA', 'Post-Fracture'],
+    phase: 'Acute',
+    sets: 3,
+    repsPerSet: 10
   },
   'shoulder-raises': {
     name: 'Shoulder Raises',
     description: 'Raise your arms to shoulder height',
     difficulty: 'Easy',
+    intensity: 0.4,
+    suitableFor: ['Shoulder Impingement', 'Stroke Recovery'],
+    phase: 'Mid',
+    sets: 3,
+    repsPerSet: 12
   },
   'elbow-flexion': {
     name: 'Elbow Flexion',
     description: 'Bend and straighten your elbow',
     difficulty: 'Easy',
+    intensity: 0.2,
+    suitableFor: ['Stroke Recovery', 'General Mobility'],
+    phase: 'Acute',
+    sets: 2,
+    repsPerSet: 15
   },
   'squats': {
     name: 'Squats',
     description: 'Full body lower limb engagement',
     difficulty: 'Medium',
+    intensity: 0.7,
+    suitableFor: ['ACL Recovery', 'Knee OA'],
+    phase: 'Advanced',
+    sets: 3,
+    repsPerSet: 10
   },
 };

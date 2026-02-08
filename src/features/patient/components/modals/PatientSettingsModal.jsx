@@ -10,6 +10,8 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
         email: '',
         phoneNumber: '',
         condition: '',
+        injuryType: 'ACL Recovery',
+        rehabPhase: 'Mid',
         // Notification settings
         emailNotifications: true,
         pushNotifications: true,
@@ -36,6 +38,8 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
                 email: patientProfile.email || '',
                 phoneNumber: patientProfile.phoneNumber || '',
                 condition: patientProfile.condition || '',
+                injuryType: patientProfile.injuryType || 'ACL Recovery',
+                rehabPhase: patientProfile.rehabPhase || 'Mid',
             }));
         }
     }, [patientProfile]);
@@ -177,11 +181,38 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
                                                 placeholder="+91 00000 00000"
                                             />
                                             <InputField
-                                                label="Condition"
+                                                label="Condition Note"
                                                 value={formData.condition}
                                                 onChange={(val) => handleInputChange('condition', val)}
                                                 placeholder="E.g. ACL Recovery"
                                             />
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Injury Type</label>
+                                                <select
+                                                    value={formData.injuryType}
+                                                    onChange={(e) => handleInputChange('injuryType', e.target.value)}
+                                                    className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-100 transition-all appearance-none"
+                                                >
+                                                    <option>ACL Recovery</option>
+                                                    <option>Stroke Recovery</option>
+                                                    <option>Knee OA</option>
+                                                    <option>Hip Replacement</option>
+                                                    <option>Post-Fracture</option>
+                                                    <option>General Mobility</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Rehab Phase</label>
+                                                <select
+                                                    value={formData.rehabPhase}
+                                                    onChange={(e) => handleInputChange('rehabPhase', e.target.value)}
+                                                    className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-blue-100 transition-all appearance-none"
+                                                >
+                                                    <option>Acute</option>
+                                                    <option>Mid</option>
+                                                    <option>Advanced</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                 </section>

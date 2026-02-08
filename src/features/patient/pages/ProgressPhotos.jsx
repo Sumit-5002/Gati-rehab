@@ -96,7 +96,11 @@ const ProgressPhotos = () => {
           </label>
         </div>
 
-        {photos.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600"></div>
+          </div>
+        ) : photos.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {photos.map((photo) => (
               <div key={photo.id} className="group relative bg-white rounded-[2.5rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-white">

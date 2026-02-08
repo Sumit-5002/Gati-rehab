@@ -12,6 +12,8 @@ import { useAuth } from '../../auth/context/AuthContext';
 const PainTracker = () => {
   const { user } = useAuth();
   const [painLevel, setPainLevel] = useState(5);
+  const [fatigue, setFatigue] = useState(3);
+  const [stiffness, setStiffness] = useState(2);
   const [note, setNote] = useState('');
   const [isLogging, setIsLogging] = useState(false);
   const [history, setHistory] = useState([]);
@@ -31,7 +33,12 @@ const PainTracker = () => {
   const handleLogPain = async () => {
     setIsLogging(true);
     try {
-      await logPainLevel(user.uid, painLevel, note);
+      await logPainLevel(user.uid, {
+        level: painLevel,
+        fatigue,
+        stiffness,
+        note
+      });
       setNote('');
       await fetchHistory();
     } catch (error) {
@@ -64,9 +71,10 @@ const PainTracker = () => {
 
       {!showHistory ? (
         <div className="space-y-8">
+          {/* Pain Level */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Current Intensity</span>
+              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Pain Intensity</span>
               <span className={`px-4 py-1 rounded-full text-white text-xs font-black ${getPainColor(painLevel)} shadow-lg transition-colors`}>
                 Level {painLevel}
               </span>
@@ -81,11 +89,38 @@ const PainTracker = () => {
                 onChange={(e) => setPainLevel(parseInt(e.target.value))}
                 className="w-full h-3 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
               />
-              <div className="flex justify-between mt-2 px-1">
-                {[0, 2, 4, 6, 8, 10].map(val => (
-                  <span key={val} className="text-[10px] font-black text-slate-300">{val}</span>
-                ))}
+            </div>
+          </div>
+
+          {/* Fatigue & Stiffness Grid */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fatigue</span>
+                <span className="text-[10px] font-black text-blue-600">{fatigue}/10</span>
               </div>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                value={fatigue}
+                onChange={(e) => setFatigue(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Stiffness</span>
+                <span className="text-[10px] font-black text-indigo-600">{stiffness}/10</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                value={stiffness}
+                onChange={(e) => setStiffness(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-500"
+              />
             </div>
           </div>
 

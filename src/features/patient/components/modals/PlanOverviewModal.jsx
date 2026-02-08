@@ -1,7 +1,7 @@
 
 import { X, FileText, CheckCircle, Clock, ShieldCheck, Activity, Target } from 'lucide-react';
 
-const PlanOverviewModal = ({ isOpen, onClose, patientData, routine }) => {
+const PlanOverviewModal = ({ isOpen, onClose, routine }) => {
     if (!isOpen) return null;
 
     return (
