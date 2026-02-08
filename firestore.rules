@@ -10,9 +10,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+    }
+
     function isDoctorOf(patientId) {
       return isAuthenticated() && 
         get(/databases/$(database)/documents/users/$(patientId)).data.doctorId == request.auth.uid;
+    }
+
+    function isPatientOf(doctorId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.doctorId == doctorId;
     }
 
     function isDocOwner(data) {
@@ -27,27 +37,27 @@ service cloud.firestore {
     
     // 1. Users collection 
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId) || isDoctorOf(userId) || isPatientOf(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
     
     // 2. Routines Collection
     match /routines/{userId} {
-      allow read: if isOwner(userId) || isDoctorOf(userId);
-      allow write: if isOwner(userId) || isDoctorOf(userId);
+      allow read: if isOwner(userId) || isDoctorOf(userId) || isAdmin();
+      allow write: if isOwner(userId) || isDoctorOf(userId) || isAdmin();
     }
     
     // 3. Sessions collection 
     match /sessions/{sessionId} {
-      allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && (isDocOwner(resource.data) || isDoctorOf(resource.data.patientId));
-      allow update, delete: if isAuthenticated() && isDocOwner(resource.data);
+      allow create: if isAuthenticated() && request.resource.data.patientId == request.auth.uid;
+      allow read: if isAuthenticated() && (isDocOwner(resource.data) || isDoctorOf(resource.data.patientId) || isAdmin());
+      allow update, delete: if isAuthenticated() && (isDocOwner(resource.data) || isAdmin());
     }
     
     // 4. Trends (Charts)
     match /trends/{patientId}/{document=**} {
-      allow read: if isOwner(patientId) || isDoctorOf(patientId);
-      allow write: if isDoctorOf(patientId);
+      allow read: if isOwner(patientId) || isDoctorOf(patientId) || isAdmin();
+      allow write: if isDoctorOf(patientId) || isAdmin();
     }
     
     // 5. Pain Logs collection
@@ -60,39 +70,48 @@ service cloud.firestore {
         resource.data.patientId == request.auth.uid || 
         (resource.data.userId == request.auth.uid && resource.data.patientId == null) ||
         isDoctorOf(resource.data.patientId) ||
-        (resource.data.userId != null && isDoctorOf(resource.data.userId))
+        (resource.data.userId != null && isDoctorOf(resource.data.userId)) ||
+        isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid || 
-        (resource.data.userId == request.auth.uid && resource.data.patientId == null)
+        (resource.data.userId == request.auth.uid && resource.data.patientId == null) ||
+        isAdmin()
       );
     }
 
     // 6. Appointments collection
     match /appointments/{appointmentId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.doctorId == request.auth.uid ||
+        request.resource.data.patientId == request.auth.uid
+      );
       allow read: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid || 
-        resource.data.doctorId == request.auth.uid
+        resource.data.doctorId == request.auth.uid ||
+        isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid || 
-        resource.data.doctorId == request.auth.uid
+        resource.data.doctorId == request.auth.uid ||
+        isAdmin()
       );
     }
 
     // 7. Messages collection
     match /messages/{messageId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
       allow read: if isAuthenticated() && (
         resource.data.senderId == request.auth.uid || 
         resource.data.receiverId == request.auth.uid ||
         (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
-        (resource.data.chatId != null && resource.data.chatId.matches('.*' + request.auth.uid + '.*'))
+        (resource.data.chatId != null && resource.data.chatId.matches('.*' + request.auth.uid + '.*')) ||
+        isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
         resource.data.senderId == request.auth.uid ||
-        (resource.data.participants != null && request.auth.uid in resource.data.participants)
+        (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
+        isAdmin()
       );
     }
     
@@ -101,7 +120,8 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
-        isDoctorOf(resource.data.userId)
+        isDoctorOf(resource.data.userId) ||
+        isAdmin()
       );
     }
 
@@ -109,27 +129,30 @@ service cloud.firestore {
     match /medications/{medicationId} {
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
-        isDoctorOf(resource.data.userId)
+        isDoctorOf(resource.data.userId) ||
+        isAdmin()
       );
       allow create: if isAuthenticated() && (
         request.resource.data.userId == request.auth.uid ||
-        isDoctorOf(request.resource.data.userId)
+        isDoctorOf(request.resource.data.userId) ||
+        isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
-        isDoctorOf(resource.data.userId)
+        isDoctorOf(resource.data.userId) ||
+        isAdmin()
       );
     }
 
     // 10. Audit Logs
     match /audit_logs/{logId} {
-      allow create: if isAuthenticated();
-      allow read: if false;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAdmin();
     }
     
     // 11. Doctor Patients relationship matching
     match /doctor_patients/{doctorId}/patients/{patientId} {
-      allow read, write: if request.auth.uid == doctorId || isOwner(patientId);
+      allow read, write: if request.auth.uid == doctorId || isOwner(patientId) || isAdmin();
     }
   }
 }

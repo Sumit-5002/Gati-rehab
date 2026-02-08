@@ -11,7 +11,7 @@ import {
   addDoc,
   deleteDoc
 } from 'firebase/firestore';
-import { db } from '../../../lib/firebase/config';
+import { auth, db } from '../../../lib/firebase/config';
 import { logAction } from '../../../shared/services/auditLogger';
 
 /**
@@ -392,9 +392,9 @@ export const updatePatientRoutine = async (patientId, routineData) => {
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    // Audit log - We don't have the doctor's UID here easily unless we pass it,
-    // but we can at least log the action on the patient
-    await logAction(patientId, 'UPDATE_ROUTINE', { updatedBy: 'doctor' });
+    // Audit log using the current authenticated user (doctor) as the actor
+    const actorId = auth.currentUser?.uid || 'unknown';
+    await logAction(actorId, 'UPDATE_ROUTINE', { patientId, updatedBy: 'doctor' });
 
     return { success: true };
   } catch (error) {

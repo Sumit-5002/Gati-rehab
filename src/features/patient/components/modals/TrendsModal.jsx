@@ -72,7 +72,12 @@ const TrendsModal = ({ isOpen, onClose, patientId }) => {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-slate-50">
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-slate-50 relative">
+                    {loading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                            <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* ROM Trend */}
                         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
