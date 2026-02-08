@@ -21,6 +21,8 @@ import NavHeader from '../../../shared/components/NavHeader';
 import { useAuth } from '../../auth/context/AuthContext';
 import { saveSession } from '../services/sessionService';
 import { calculateFormQualityScore, trackRangeOfMotion } from '../utils/enhancedScoring';
+import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
+import { getPrimaryAngle } from '../../ai/utils/angleCalculations';
 
 const WorkoutSession = () => {
   const navigate = useNavigate();
@@ -39,14 +41,10 @@ const WorkoutSession = () => {
   const [realTimeFeedback, setRealTimeFeedback] = useState(null);
   const [isDevMode, setIsDevMode] = useState(location.state?.devMode || false);
 
-  const availableExercises = [
-    { id: 'knee-bends', name: 'Knee Bends' },
-    { id: 'leg-raises', name: 'Leg Raises' },
-    { id: 'hip-flexion', name: 'Hip Flexion' },
-    { id: 'shoulder-raises', name: 'Shoulder Raises' },
-    { id: 'elbow-flexion', name: 'Elbow Flexion' },
-    { id: 'standing-march', name: 'Standing March' }
-  ];
+  const availableExercises = Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
+    id,
+    name: data.name
+  }));
 
   const timerRef = useRef(null);
   const previousPhaseRef = useRef('start');
@@ -61,30 +59,45 @@ const WorkoutSession = () => {
 
   // Detect when a rep is completed
   const detectRepCompletion = useCallback((angles) => {
-    // Dynamic joint selection based on exercise
-    let primaryAngle = 180;
+    // Resolve primary angle using utility
+    const primaryAngle = getPrimaryAngle(angles, currentExercise);
+
+    // Default thresholds for most flexion exercises (Knee, Hip, Elbow)
     let thresholdLow = 100;
     let thresholdHigh = 155;
+    let isFlexionExercise = true; // Angle decreases during flexion (most exercises)
 
-    if (currentExercise.includes('knee')) {
-      primaryAngle = Math.min(angles.leftKnee || 180, angles.rightKnee || 180);
+    if (currentExercise.includes('shoulder')) {
+      thresholdLow = 90; // Flexion target
+      thresholdHigh = 30; // Return target
+      isFlexionExercise = false; // Angle increases during flexion
     } else if (currentExercise.includes('hip') || currentExercise.includes('march') || currentExercise.includes('leg')) {
-      primaryAngle = Math.min(angles.leftHip || 180, angles.rightHip || 180);
       thresholdLow = 110;
       thresholdHigh = 160;
-    } else if (currentExercise.includes('shoulder')) {
-      primaryAngle = Math.max(angles.leftShoulder || 0, angles.rightShoulder || 0);
-      thresholdLow = 140; // Extension for status
-      thresholdHigh = 60; // Return
+    } else if (currentExercise.includes('elbow')) {
+      thresholdLow = 90;
+      thresholdHigh = 150;
     }
 
-    // Generic phase detection (Flexion -> Extension toggle)
-    if (primaryAngle < thresholdLow && previousPhaseRef.current !== 'low') {
-      previousPhaseRef.current = 'low';
-    } else if (primaryAngle > thresholdHigh && previousPhaseRef.current === 'low') {
-      setRepCount(prev => prev + 1);
-      previousPhaseRef.current = 'high';
-      updateQualityScore();
+    // Generic phase detection
+    if (isFlexionExercise) {
+      // Flexion -> Extension toggle (e.g. Knee Bends: 180 -> 90 -> 180)
+      if (primaryAngle < thresholdLow && previousPhaseRef.current !== 'low') {
+        previousPhaseRef.current = 'low';
+      } else if (primaryAngle > thresholdHigh && previousPhaseRef.current === 'low') {
+        setRepCount(prev => prev + 1);
+        previousPhaseRef.current = 'high';
+        updateQualityScore();
+      }
+    } else {
+      // Extension -> Flexion toggle (e.g. Shoulder Raises: 0 -> 90 -> 0)
+      if (primaryAngle > thresholdLow && previousPhaseRef.current !== 'low') {
+        previousPhaseRef.current = 'low';
+      } else if (primaryAngle < thresholdHigh && previousPhaseRef.current === 'low') {
+        setRepCount(prev => prev + 1);
+        previousPhaseRef.current = 'high';
+        updateQualityScore();
+      }
     }
   }, [currentExercise, updateQualityScore]);
 
@@ -100,8 +113,8 @@ const WorkoutSession = () => {
       frameDataRef.current.shift();
     }
 
-    // Update current angle (knee angle for knee-bends)
-    const primaryAngle = angles.leftKnee || angles.rightKnee || 0;
+    // Update current angle (dynamic based on exercise)
+    const primaryAngle = getPrimaryAngle(angles, currentExercise);
     setCurrentAngle(Math.round(primaryAngle));
     angleHistoryRef.current.push(primaryAngle);
 
@@ -113,7 +126,7 @@ const WorkoutSession = () => {
 
     // Detect rep completion
     detectRepCompletion(angles);
-  }, [sessionActive, detectRepCompletion]);
+  }, [sessionActive, detectRepCompletion, currentExercise]);
 
   // Timer effect
   useEffect(() => {

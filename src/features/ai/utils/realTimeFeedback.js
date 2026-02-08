@@ -59,8 +59,7 @@ const FEEDBACK_MESSAGES = {
  */
 export const generateRealTimeFeedback = (
   currentAngles,
-  exerciseType,
-  previousState = {}
+  exerciseType
 ) => {
   if (!currentAngles || !IDEAL_ANGLES[exerciseType]) {
     return {
@@ -81,11 +80,27 @@ export const generateRealTimeFeedback = (
 
   // Analyze each relevant joint for this exercise
   for (const [joint, range] of Object.entries(idealRanges)) {
-    const currentAngle = currentAngles[`${joint}Angle`] || 
-                        currentAngles[joint] || 
-                        0;
+    // Resolve joint angle, handling left/right variants
+    let currentAngle = currentAngles[`${joint}Angle`] || currentAngles[joint] || 0;
 
-    if (currentAngle === 0) continue;
+    if (currentAngle === 0) {
+      // Try resolving from left/right variants
+      const capitalizedJoint = joint.charAt(0).toUpperCase() + joint.slice(1);
+      const leftAngle = currentAngles[`left${capitalizedJoint}`];
+      const rightAngle = currentAngles[`right${capitalizedJoint}`];
+
+      if (leftAngle !== undefined || rightAngle !== undefined) {
+        // Use the angle that deviates most from rest position
+        // Rest is 0 for shoulder, 180 for others
+        const restValue = joint === 'shoulder' ? 0 : 180;
+        const l = leftAngle !== undefined ? leftAngle : restValue;
+        const r = rightAngle !== undefined ? rightAngle : restValue;
+        currentAngle = Math.abs(l - restValue) > Math.abs(r - restValue) ? l : r;
+      }
+    }
+
+    // Skip if still no angle found (except for shoulder where 0 is a valid rest angle)
+    if (currentAngle === 0 && joint !== 'shoulder') continue;
 
     const feedback = analyzeJointAngle(currentAngle, range, joint);
 

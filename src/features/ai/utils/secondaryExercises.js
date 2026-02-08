@@ -272,4 +272,9 @@ export const AVAILABLE_EXERCISES = {
     description: 'Raise your arms to shoulder height',
     difficulty: 'Easy',
   },
+  'elbow-flexion': {
+    name: 'Elbow Flexion',
+    description: 'Bend and straighten your elbow',
+    difficulty: 'Easy',
+  },
 };

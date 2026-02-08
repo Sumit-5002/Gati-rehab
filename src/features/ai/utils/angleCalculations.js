@@ -189,17 +189,31 @@ export const calculateAngles = (keypoints) => {
 /**
  * Get specific angle based on exercise type
  * @param {Object} angles - Calculated angles object
- * @param {string} exerciseType - Type of exercise (e.g., 'knee-bend', 'leg-raise')
+ * @param {string} exerciseType - Type of exercise (e.g., 'knee-bends', 'leg-raises')
  * @returns {number} - Primary angle for the exercise
  */
 export const getPrimaryAngle = (angles, exerciseType) => {
   if (!angles) return 0;
 
+  // Helper to get the angle that has moved furthest from rest position
+  const getActiveAngle = (left, right, restValue = 180) => {
+    const l = left !== undefined ? left : restValue;
+    const r = right !== undefined ? right : restValue;
+    return Math.abs(l - restValue) > Math.abs(r - restValue) ? l : r;
+  };
+
   const exerciseAngleMap = {
-    'knee-bend': angles.leftKnee || angles.rightKnee,
-    'leg-raise': angles.leftHip || angles.rightHip,
-    'arm-raise': angles.leftShoulder || angles.rightShoulder,
-    'elbow-flex': angles.leftElbow || angles.rightElbow,
+    'knee-bends': getActiveAngle(angles.leftKnee, angles.rightKnee, 180),
+    'leg-raises': getActiveAngle(angles.leftHip, angles.rightHip, 180),
+    'hip-flexion': getActiveAngle(angles.leftHip, angles.rightHip, 180),
+    'shoulder-raises': getActiveAngle(angles.leftShoulder, angles.rightShoulder, 0),
+    'elbow-flexion': getActiveAngle(angles.leftElbow, angles.rightElbow, 180),
+    'standing-march': getActiveAngle(angles.leftHip, angles.rightHip, 180),
+    // Support legacy names
+    'knee-bend': getActiveAngle(angles.leftKnee, angles.rightKnee, 180),
+    'leg-raise': getActiveAngle(angles.leftHip, angles.rightHip, 180),
+    'arm-raise': getActiveAngle(angles.leftShoulder, angles.rightShoulder, 0),
+    'elbow-flex': getActiveAngle(angles.leftElbow, angles.rightElbow, 180),
   };
 
   return exerciseAngleMap[exerciseType] || 0;
