@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -36,7 +35,8 @@ import {
   getPatientStats,
   getTodayRoutine,
   getRecentSessions,
-  subscribeToPatientData
+  subscribeToPatientData,
+  subscribeToWeeklySessions
 } from '../services/patientService';
 
 const PatientDashboard = () => {
@@ -58,6 +58,10 @@ const PatientDashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
+
+  const handlePhysioLink = () => navigate('/patient/physio-link');
+  const handleReports = () => navigate('/patient/reports');
+  const handleTrends = () => navigate('/patient/trends');
 
   const handleSettingsUpdate = async (data) => {
     try {
@@ -91,7 +95,7 @@ const PatientDashboard = () => {
 
     fetchData();
 
-    const unsubscribe = subscribeToPatientData(user.uid, (data) => {
+    const unsubPatient = subscribeToPatientData(user.uid, (data) => {
       if (data) {
         setStats(prev => ({
           ...prev,
@@ -102,7 +106,14 @@ const PatientDashboard = () => {
       }
     });
 
-    return () => unsubscribe();
+    const unsubWeekly = subscribeToWeeklySessions(user.uid, (weeklyCount) => {
+      setStats(prev => ({ ...prev, completed: weeklyCount }));
+    });
+
+    return () => {
+      unsubPatient();
+      unsubWeekly();
+    };
   }, [user]);
 
   if (loading) {
@@ -328,25 +339,15 @@ const PatientDashboard = () => {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">Quick Access Laboratory</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-4">
-                <ActionTile
-                  icon={<Video className="w-5 h-5" />}
-                  label="Schedule Call"
-                  color="blue"
-                  onClick={() => setScheduleOpen(true)}
-                />
+                <ActionTile icon={<Video className="w-5 h-5" />} label="Physio Link" color="blue" onClick={handlePhysioLink} />
                 <ActionTile
                   icon={<Plus className="w-5 h-5" />}
                   label="Log Pain"
                   color="rose"
                   onClick={() => setPainModalOpen(true)}
                 />
-                <ActionTile
-                  icon={<History className="w-5 h-5" />}
-                  label="History"
-                  color="indigo"
-                  onClick={() => navigate('/history')}
-                />
-                <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends" color="emerald" />
+                <ActionTile icon={<FileText className="w-5 h-5" />} label="Reports" color="indigo" onClick={handleReports} />
+                <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends"  color="emerald"  onClick={handleTrends}/>
               </div>
             </div>
 

@@ -3,28 +3,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import ProtectedRoute from '../../shared/components/ProtectedRoute';
 import { useAuth } from '../../features/auth/context/AuthContext';
-import useSessionTimeout from '../../shared/hooks/useSessionTimeout';
-
-// Lazy load pages for performance optimization
-const LandingPage = lazy(() => import('../../features/auth/pages/LandingPage'));
-const LoginPage = lazy(() => import('../../features/auth/pages/LoginPage'));
-const PatientDashboard = lazy(() => import('../../features/patient/pages/PatientDashboard'));
-const WorkoutSession = lazy(() => import('../../features/patient/pages/WorkoutSession'));
-const ProfilePage = lazy(() => import('../../features/patient/pages/ProfilePage'));
-const HistoryPage = lazy(() => import('../../features/patient/pages/HistoryPage'));
-const PatientMessagesPage = lazy(() => import('../../features/patient/pages/MessagesPage'));
-const DoctorDashboard = lazy(() => import('../../features/doctor/pages/DoctorDashboard'));
-const PatientDetailView = lazy(() => import('../../features/doctor/pages/PatientDetailView'));
-
-// Loading component for Suspense fallback
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
-    <div className="relative w-16 h-16">
-      <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-500/20 rounded-full"></div>
-      <div className="absolute top-0 left-0 w-full h-full border-4 border-t-blue-500 rounded-full animate-spin"></div>
-    </div>
-  </div>
-);
+import Trends from '../../features/patient/pages/Trends';
+import PhysioLink from '../../features/patient/pages/PhysioLink';
+import Reports from '../../features/patient/pages/Reports';
 
 function AppRoutes() {
   const { user, userData, loading } = useAuth();
@@ -60,70 +41,68 @@ function AppRoutes() {
           }
         />
 
-        {/* Patient Routes */}
-        <Route
-          path="/patient-dashboard"
-          element={
-            <ProtectedRoute allowedRole="patient">
-              <PatientDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/workout"
-          element={
-            <ProtectedRoute allowedRole="patient">
-              <WorkoutSession />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute allowedRole="patient">
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute allowedRole="patient">
-              <HistoryPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <ProtectedRoute allowedRole="patient">
-              <PatientMessagesPage />
-            </ProtectedRoute>
-          }
-        />
+      {/* Patient Routes */}
+      <Route
+        path="/patient-dashboard"
+        element={
+          <ProtectedRoute allowedRole="patient">
+            <PatientDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workout"
+        element={
+          <ProtectedRoute allowedRole="patient">
+            <WorkoutSession />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patient/physio-link"
+        element={
+          <ProtectedRoute allowedRole="patient">
+            <PhysioLink />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patient/reports"
+        element={
+          <ProtectedRoute allowedRole="patient">
+            <Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patient/trends"
+        element={
+          <ProtectedRoute allowedRole="patient">
+            <Trends />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* Doctor Routes */}
-        <Route
-          path="/doctor-dashboard"
-          element={
-            <ProtectedRoute allowedRole="doctor">
-              <DoctorDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/patient/:patientId"
-          element={
-            <ProtectedRoute allowedRole="doctor">
-              <PatientDetailView />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Redirect unknown routes */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+      {/* Doctor Routes */}
+      <Route
+        path="/doctor-dashboard"
+        element={
+          <ProtectedRoute allowedRole="doctor">
+            <DoctorDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patient/:patientId"
+        element={
+          <ProtectedRoute allowedRole="doctor">
+            <PatientDetailView />
+          </ProtectedRoute>
+        }
+      />
+      {/* Redirect unknown routes */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

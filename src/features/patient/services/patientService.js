@@ -127,6 +127,27 @@ export const getRecentSessions = async (patientId, limitCount = 10) => {
 };
 
 /**
+ * Subscribe to weekly sessions count (real-time) for progress bar
+ */
+export const subscribeToWeeklySessions = (patientId, callback) => {
+  const sessionsRef = collection(db, 'sessions');
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const weeklyQuery = query(
+    sessionsRef,
+    where('patientId', '==', patientId),
+    where('date', '>=', weekAgo)
+  );
+
+  return onSnapshot(weeklyQuery, (snapshot) => {
+    callback(snapshot.size);
+  }, (error) => {
+    console.error('[PatientService] Subscribe weekly sessions error:', error);
+  });
+};
+
+/**
  * Subscribe to patient data changes (real-time)
  */
 export const subscribeToPatientData = (patientId, callback) => {
