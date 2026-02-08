@@ -317,7 +317,7 @@ export const getFormQualityTrendData = async (doctorId, patients = null) => {
  */
 export const getROMTrendData = async (doctorId) => {
   try {
-    // Even if ROM data is mocked, we accept the arg for consistency
+    // Even if ROM data is mocked, we accept the args for consistency
     const last4Weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
 
     return last4Weeks.map(week => ({

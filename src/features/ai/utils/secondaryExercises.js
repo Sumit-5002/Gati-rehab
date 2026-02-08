@@ -127,8 +127,8 @@ export const validateStartingPosition = (angles) => {
     message: allValid 
       ? 'Perfect starting position! Ready to begin.'
       : 'Adjust your position: ' + Object.entries(isValid)
-          .filter(([_, v]) => !v)
-          .map(([k, _]) => k)
+          .filter(([, v]) => !v)
+          .map(([k]) => k)
           .join(', '),
   };
 };

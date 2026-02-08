@@ -23,6 +23,7 @@ import { saveSession } from '../services/sessionService';
 import { calculateFormQualityScore, trackRangeOfMotion } from '../utils/enhancedScoring';
 import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
 import { getPrimaryAngle } from '../../ai/utils/angleCalculations';
+import { logAction } from '../../../shared/utils/auditLogger';
 
 const WorkoutSession = () => {
   const navigate = useNavigate();
@@ -307,27 +308,27 @@ const WorkoutSession = () => {
           </div>
 
           {/* Metrics - More compact for mobile */}
-          <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-4 flex flex-col justify-center">
-              <div className="flex justify-between items-end mb-2">
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
+            <div className="bg-slate-900/50 rounded-xl sm:rounded-2xl border border-white/5 p-3 sm:p-4 flex flex-col justify-center">
+              <div className="flex justify-between items-end mb-1 sm:mb-2">
                 <div>
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Live Feed</p>
-                  <p className="text-xs font-bold text-slate-300">Joint Angle</p>
+                  <p className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Live Feed</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-300">Joint Angle</p>
                 </div>
-                <span className="text-2xl font-black text-blue-400">{currentAngle}°</span>
+                <span className="text-lg sm:text-2xl font-black text-blue-400">{currentAngle}°</span>
               </div>
               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${currentAngle / 1.8}%` }}></div>
               </div>
             </div>
 
-            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-4 flex flex-col justify-center">
-              <div className="flex justify-between items-end mb-2">
+            <div className="bg-slate-900/50 rounded-xl sm:rounded-2xl border border-white/5 p-3 sm:p-4 flex flex-col justify-center">
+              <div className="flex justify-between items-end mb-1 sm:mb-2">
                 <div>
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Neural AI</p>
-                  <p className="text-xs font-bold text-slate-300">Form Quality</p>
+                  <p className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Neural AI</p>
+                  <p className="text-[10px] sm:text-xs font-bold text-slate-300">Form Quality</p>
                 </div>
-                <span className="text-2xl font-black text-emerald-400">{formQuality}%</span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-400">{formQuality}%</span>
               </div>
               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${formQuality}%` }}></div>

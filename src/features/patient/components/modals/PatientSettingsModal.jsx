@@ -25,6 +25,16 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        if (isOpen) {
+            window.addEventListener('keydown', handleEscape);
+        }
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, onClose]);
+
+    useEffect(() => {
         if (patientProfile) {
             setFormData((prev) => ({
                 ...prev,

@@ -5,17 +5,8 @@ import { Download, X, Smartphone, Sparkles } from 'lucide-react';
 const PWAInstallPrompt = () => {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showPrompt, setShowPrompt] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
-        // Detect if device is mobile
-        const checkMobile = () => {
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            if (/android|iphone|ipad|ipod/i.test(userAgent.toLowerCase())) {
-                setIsMobile(true);
-            }
-        };
-        checkMobile();
 
         // Listen for beforeinstallprompt event
         const handleBeforeInstallPrompt = (e) => {
@@ -27,11 +18,10 @@ const PWAInstallPrompt = () => {
             setShowPrompt(true);
         };
 
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
         // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            setShowPrompt(false);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        if (!isStandalone) {
+            window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         }
 
         return () => {

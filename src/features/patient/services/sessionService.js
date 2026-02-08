@@ -120,6 +120,7 @@ export const getPendingSessionsCount = () => {
 /**
  * Update patient statistics after session
  */
+// eslint-disable-next-line no-unused-vars
 const updatePatientStats = async (userId, sessionData) => {
   try {
     const userRef = doc(db, 'users', userId);

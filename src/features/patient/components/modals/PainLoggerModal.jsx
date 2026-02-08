@@ -1,25 +1,49 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Send, Activity, Thermometer, Smile, Meh, Frown, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { logPain } from '../../services/patientService';
+import { useAuth } from '../../../auth/context/AuthContext';
 
 const PainLoggerModal = ({ isOpen, onClose }) => {
+    const { user } = useAuth();
     const [painLevel, setPainLevel] = useState(3);
     const [location, setLocation] = useState('Knee');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
+    useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        if (isOpen) {
+            window.addEventListener('keydown', handleEscape);
+        }
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, onClose]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!user) return;
+
         setLoading(true);
-        // Simulate API call
-        await new Promise(r => setTimeout(r, 1500));
-        setLoading(false);
-        setSuccess(true);
-        setTimeout(() => {
-            setSuccess(false);
-            onClose();
-        }, 2000);
+        try {
+            await logPain(user.uid, {
+                painLevel,
+                location,
+                description,
+                date: new Date().toISOString()
+            });
+            setSuccess(true);
+            setTimeout(() => {
+                setSuccess(false);
+                onClose();
+            }, 2000);
+        } catch (error) {
+            console.error('[PainLoggerModal] Failed to log pain:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (!isOpen) return null;

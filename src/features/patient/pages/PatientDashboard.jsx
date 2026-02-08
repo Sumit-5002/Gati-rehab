@@ -57,6 +57,7 @@ const PatientDashboard = () => {
   const [painModalOpen, setPainModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [hasNotifications, setHasNotifications] = useState(true);
 
   const handleSettingsUpdate = async (data) => {
     try {
@@ -101,9 +102,7 @@ const PatientDashboard = () => {
       }
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [user]);
 
   if (loading) {
@@ -152,9 +151,12 @@ const PatientDashboard = () => {
             <button 
               className="bg-white p-4 rounded-2xl border border-slate-100 text-slate-400 hover:text-blue-600 transition-all shadow-lg active:scale-90 relative"
               aria-label="View notifications"
+              onClick={() => setHasNotifications(false)}
             >
               <Bell className="w-5 h-5 transition-transform" />
-              <span className="absolute top-4 right-4 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>
+              {hasNotifications && (
+                <span className="absolute top-4 right-4 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm animate-pulse"></span>
+              )}
             </button>
           </div>
         </div>
@@ -333,12 +335,17 @@ const PatientDashboard = () => {
                   onClick={() => setScheduleOpen(true)}
                 />
                 <ActionTile
+                  icon={<Plus className="w-5 h-5" />}
+                  label="Log Pain"
+                  color="rose"
+                  onClick={() => setPainModalOpen(true)}
+                />
+                <ActionTile
                   icon={<History className="w-5 h-5" />}
                   label="History"
                   color="indigo"
                   onClick={() => navigate('/history')}
                 />
-                <ActionTile icon={<FileText className="w-5 h-5" />} label="Reports" color="rose" />
                 <ActionTile icon={<TrendingUp className="w-5 h-5" />} label="Trends" color="emerald" />
               </div>
             </div>
@@ -419,7 +426,7 @@ const PatientDashboard = () => {
       <ScheduleModal
         isOpen={scheduleOpen}
         onClose={() => setScheduleOpen(false)}
-        user={{ uid: user.uid, name: userData?.name }}
+        user={{ uid: user?.uid, name: userData?.name }}
         doctorId={userData?.doctorId}
       />
     </div>

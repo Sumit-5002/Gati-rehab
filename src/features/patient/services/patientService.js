@@ -12,7 +12,7 @@ import {
   getDocs,
   onSnapshot,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
 
@@ -200,7 +200,26 @@ export const getTrendData = async (patientId) => {
 };
 
 /**
- * Log pain level
+ * Log comprehensive pain data
+ */
+export const logPain = async (patientId, painData) => {
+  try {
+    const painLogsRef = collection(db, 'pain_logs');
+    const docRef = await addDoc(painLogsRef, {
+      ...painData,
+      patientId,
+      timestamp: serverTimestamp(),
+    });
+    console.log('[PatientService] Pain log saved:', docRef.id);
+    return { id: docRef.id, success: true };
+  } catch (error) {
+    console.error('[PatientService] Log pain error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Log simple pain level
  */
 export const logPainLevel = async (patientId, level, note = '') => {
   try {
@@ -213,7 +232,7 @@ export const logPainLevel = async (patientId, level, note = '') => {
     });
     return { success: true };
   } catch (error) {
-    console.error('[PatientService] Log pain error:', error);
+    console.error('[PatientService] Log pain level error:', error);
     throw error;
   }
 };

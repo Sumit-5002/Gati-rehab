@@ -4,10 +4,14 @@ import { CheckCircle, XCircle, TrendingUp, Activity, Timer, Zap } from 'lucide-r
 const SessionReport = ({ sessionData }) => {
   const { exerciseName, date, reps, quality, rangeOfMotion, duration } = sessionData;
 
-  const getQualityColor = (score) => {
-    if (score >= 80) return 'text-emerald-500';
-    if (score >= 60) return 'text-amber-500';
-    return 'text-rose-500';
+  const getGrade = (score) => {
+    if (score >= 95) return 'A+';
+    if (score >= 90) return 'A';
+    if (score >= 85) return 'B+';
+    if (score >= 80) return 'B';
+    if (score >= 70) return 'C';
+    if (score >= 60) return 'D';
+    return 'F';
   };
 
   const getQualityIcon = (score) => {
@@ -20,7 +24,12 @@ const SessionReport = ({ sessionData }) => {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h3 className="text-xl font-black text-slate-900 tracking-tight capitalize mb-1">{exerciseName.replace('-', ' ')}</h3>
+          <div className="flex items-center gap-3 mb-1">
+            <h3 className="text-xl font-black text-slate-900 tracking-tight capitalize">{exerciseName.replace(/-/g, ' ')}</h3>
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+              Grade {getGrade(quality)}
+            </span>
+          </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{date || 'Recent Session'}</p>
         </div>
         <div className="bg-slate-50 p-3 rounded-2xl group-hover:scale-110 transition-transform">
@@ -29,7 +38,7 @@ const SessionReport = ({ sessionData }) => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <ReportStat
           icon={<Zap className="w-4 h-4" />}
           label="Repetitions"

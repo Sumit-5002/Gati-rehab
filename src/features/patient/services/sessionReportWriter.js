@@ -2,7 +2,6 @@
 // Saves final session reports as JSON locally on the phone
 // Owner: Member 4/6
 
-import { saveSessionData, addToPendingSync } from '../../../utils/localStorage';
 
 const STORAGE_KEYS = {
   SESSION_REPORTS: 'gati_session_reports',

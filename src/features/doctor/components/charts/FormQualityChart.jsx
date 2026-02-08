@@ -4,6 +4,21 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Activity } from 'lucide-react';
 
+// Custom tooltip
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+        <p className="text-sm font-medium text-gray-900">{payload[0].payload.date}</p>
+        <p className="text-sm text-green-600 font-semibold mt-1">
+          Quality Score: {payload[0].value}/100
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 const FormQualityChart = ({ data, loading = false }) => {
   if (loading) {
     return (
