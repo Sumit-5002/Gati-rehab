@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -25,6 +25,13 @@ import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
 import { getPrimaryAngle } from '../../ai/utils/angleCalculations';
 import { logAction } from '../../../shared/utils/auditLogger';
 
+// Move static helper functions outside to avoid recreation on every render
+const formatTime = (seconds) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 const WorkoutSession = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,16 +48,22 @@ const WorkoutSession = () => {
   const frameDataRef = useRef([]); // Use ref for high-frequency data to avoid re-renders
   const [realTimeFeedback, setRealTimeFeedback] = useState(null);
   const [isDevMode, setIsDevMode] = useState(location.state?.devMode || false);
-  const [frameData, setFrameData] = useState([]);
 
-  const availableExercises = Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
+  // Memoize static exercise list derived from constant
+  const availableExercises = useMemo(() => Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
     id,
     name: data.name
-  }));
+  })), []);
 
   const timerRef = useRef(null);
   const previousPhaseRef = useRef('start');
   const angleHistoryRef = useRef([]);
+
+  // Memoize AI settings to prevent AIEngine (memoized) from re-rendering on every frame
+  const aiSettings = useMemo(() => ({
+    audioCues: userData?.audioCues,
+    motionFeedback: userData?.motionFeedback
+  }), [userData?.audioCues, userData?.motionFeedback]);
 
   const updateQualityScore = useCallback(() => {
     if (frameDataRef.current.length > 0) {
@@ -110,11 +123,6 @@ const WorkoutSession = () => {
     // Store frame data for later analysis
     frameDataRef.current = [...frameDataRef.current, { angles, timestamp, feedback: rtFeedback }].slice(-1000);
 
-    // Periodically update state for UI elements that might need it, but keep it minimal
-    if (frameDataRef.current.length % 10 === 0) {
-      setFrameData(frameDataRef.current);
-    }
-
     // Update current angle dynamically based on exercise
     const primaryAngle = getPrimaryAngle(angles, currentExercise);
     if (primaryAngle !== undefined) {
@@ -130,7 +138,7 @@ const WorkoutSession = () => {
 
     // Detect rep completion
     detectRepCompletion(angles);
-  }, [sessionActive, detectRepCompletion]);
+  }, [sessionActive, detectRepCompletion, currentExercise]);
 
   // Timer effect
   useEffect(() => {
@@ -191,12 +199,6 @@ const WorkoutSession = () => {
       console.error('Failed to save session:', error);
       navigate('/patient-dashboard');
     }
-  };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -279,10 +281,7 @@ const WorkoutSession = () => {
                   onPoseDetected={handlePoseDetected}
                   exerciseType={currentExercise}
                   repCount={repCount}
-                  settings={{
-                    audioCues: userData?.audioCues,
-                    motionFeedback: userData?.motionFeedback
-                  }}
+                  settings={aiSettings}
                 />
               </div>
 

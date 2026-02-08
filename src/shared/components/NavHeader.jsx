@@ -1,10 +1,11 @@
 
 // NavHeader Component - Navigation header with Auth integration
+import { memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Activity, LayoutDashboard, LogOut, User, Settings, Zap, Compass, Sparkles, UserCircle, MessageSquare, FileText } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 
-const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick = null, theme = 'light' }) => {
+const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettingsClick = null, theme = 'light' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, userData } = useAuth();
@@ -158,7 +159,7 @@ const NavHeader = ({ userType = 'patient', doctorProfile = null, onSettingsClick
 
     </header>
   );
-};
+});
 
 const NavButton = ({ active, onClick, icon, label }) => (
   <button
