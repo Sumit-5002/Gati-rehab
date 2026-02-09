@@ -1,7 +1,7 @@
-// SessionReport Component - Display session summary with premium aesthetics
+import { memo } from 'react';
 import { CheckCircle, XCircle, TrendingUp, Activity, Timer, Zap } from 'lucide-react';
 
-const SessionReport = ({ sessionData }) => {
+const SessionReport = memo(({ sessionData }) => {
   const { exerciseName, date, reps, quality, rangeOfMotion, duration } = sessionData;
 
   const getGrade = (score) => {
@@ -66,7 +66,7 @@ const SessionReport = ({ sessionData }) => {
       </div>
     </div>
   );
-};
+});
 
 const ReportStat = ({ icon, label, value, color }) => {
   const styles = {

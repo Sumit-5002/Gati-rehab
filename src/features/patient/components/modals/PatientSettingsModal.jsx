@@ -40,6 +40,15 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
                 condition: patientProfile.condition || '',
                 injuryType: patientProfile.injuryType || 'ACL Recovery',
                 rehabPhase: patientProfile.rehabPhase || 'Mid',
+                emailNotifications: patientProfile.emailNotifications ?? true,
+                pushNotifications: patientProfile.pushNotifications ?? true,
+                smsNotifications: patientProfile.smsNotifications ?? false,
+                dailyReminder: patientProfile.dailyReminder ?? true,
+                reminderTime: patientProfile.reminderTime || '09:00',
+                motionFeedback: patientProfile.motionFeedback ?? true,
+                audioCues: patientProfile.audioCues ?? true,
+                highContrast: patientProfile.highContrast ?? false,
+                autoSave: patientProfile.autoSave ?? true
             }));
         }
     }, [patientProfile]);
@@ -54,9 +63,6 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
         setSaveSuccess(false);
 
         try {
-            // Simulate save operation
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-
             if (onSave) {
                 await onSave(formData);
             }
@@ -277,13 +283,59 @@ const PatientSettingsModal = ({ isOpen, onClose, patientProfile, onSave }) => {
 
                         {activeTab === 'security' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="p-10 bg-blue-50 rounded-[2.5rem] border border-blue-100 text-center">
-                                    <Shield className="w-16 h-16 text-blue-500 mx-auto mb-6" />
-                                    <h3 className="text-2xl font-black text-slate-900 mb-2">Clinical Data Privacy</h3>
-                                    <p className="text-slate-500 font-bold mb-8">All your recovery data is encrypted and only accessible by your assigned medical professional.</p>
-                                    <button className="px-8 py-3 bg-white text-slate-900 border border-slate-200 rounded-2xl font-black hover:bg-slate-50 transition-all shadow-sm">
-                                        Manage Authorized Clinicians
-                                    </button>
+                                <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 flex flex-col items-center text-center">
+                                    <Shield className="w-16 h-16 text-blue-500 mb-6 bg-white p-4 rounded-2xl shadow-sm" />
+                                    <h3 className="text-2xl font-black text-slate-900 mb-2">Connect with Clinic</h3>
+                                    <p className="text-slate-500 font-bold mb-8 max-w-sm">Enter your doctor's email address to securely link your recovery data.</p>
+
+                                    <div className="w-full max-w-md space-y-4">
+                                        <div className="relative group">
+                                            <User className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                            <input
+                                                type="email"
+                                                placeholder="doctor@clinic.com"
+                                                className="w-full pl-16 pr-6 py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all placeholder:text-slate-300"
+                                                id="doctor-email-input"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={async (e) => {
+                                                const email = document.getElementById('doctor-email-input').value;
+                                                const btn = e.currentTarget;
+                                                const originalText = 'Send Connection Request';
+
+                                                if (!email) return alert('Please enter an email');
+
+                                                try {
+                                                    btn.disabled = true;
+                                                    btn.innerText = 'Linking...';
+                                                    const { connectWithDoctor } = await import('../../services/patientService');
+                                                    const result = await connectWithDoctor(patientProfile.id, email);
+
+                                                    btn.innerText = 'Success!';
+                                                    btn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+                                                    btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+
+                                                    setTimeout(() => {
+                                                        btn.innerText = `Linked to ${result.doctorName}`;
+                                                    }, 1500);
+                                                } catch (err) {
+                                                    alert(err.message);
+                                                    btn.innerText = originalText;
+                                                    btn.disabled = false;
+                                                }
+                                            }}
+                                            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            Send Connection Request
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Status</p>
+                                    <p className="text-lg font-bold text-slate-700 mt-1">
+                                        {patientProfile?.doctorName ? `Linked to ${patientProfile.doctorName}` : 'No Active Supervising Clinician'}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -329,8 +381,8 @@ const TabButton = ({ active, onClick, icon, label }) => (
     <button
         onClick={onClick}
         className={`relative group flex items-center justify-center md:justify-start gap-4 p-4 rounded-2xl transition-all duration-300 ${active
-                ? 'bg-slate-900 text-white shadow-xl shadow-slate-200'
-                : 'text-slate-400 hover:bg-white hover:text-slate-900'
+            ? 'bg-slate-900 text-white shadow-xl shadow-slate-200'
+            : 'text-slate-400 hover:bg-white hover:text-slate-900'
             }`}
     >
         <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>

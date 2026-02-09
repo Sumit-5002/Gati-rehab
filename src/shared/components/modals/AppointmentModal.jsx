@@ -24,6 +24,7 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
     date: '',
     time: '',
     type: 'Video Call',
+    meetingLink: 'https://meet.google.com/ayd-uthv-yvd',
     notes: ''
   });
 
@@ -38,8 +39,8 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
 
     const q = query(
       collection(db, 'appointments'),
-      where(userRole === 'doctor' ? 'doctorId' : 'patientId', '==', user.uid),
-      orderBy('timestamp', 'desc')
+      where(userRole === 'doctor' ? 'doctorId' : 'patientId', '==', user.uid)
+      // orderBy removed to prevent index errors
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -47,6 +48,14 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
       snapshot.forEach((doc) => {
         apps.push({ id: doc.id, ...doc.data() });
       });
+
+      // Client-side sort
+      apps.sort((a, b) => {
+        const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(`${a.date} ${a.time}`).getTime();
+        const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : new Date(`${b.date} ${b.time}`).getTime();
+        return tB - tA;
+      });
+
       setAppointments(apps);
     });
 
@@ -74,6 +83,7 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
         date: formData.date,
         time: formData.time,
         type: formData.type,
+        meetingLink: formData.meetingLink,
         notes: formData.notes,
         status: 'pending',
         timestamp: serverTimestamp()
@@ -82,7 +92,7 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        setFormData({ date: '', time: '', type: 'Video Call', notes: '' });
+        setFormData({ date: '', time: '', type: 'Video Call', meetingLink: 'https://meet.google.com/ayd-uthv-yvd', notes: '' });
       }, 3000);
     } catch (error) {
       console.error('[AppointmentModal] Error booking appointment:', error);
@@ -169,6 +179,24 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
               </div>
             </div>
 
+            {formData.type === 'Video Call' && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Video Link (Default)</label>
+                <div className="relative">
+                  <Video className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="url"
+                    readOnly
+                    className="w-full pl-12 pr-4 py-4 bg-slate-100 border-none rounded-2xl font-bold text-slate-500 cursor-not-allowed select-all"
+                    value={formData.meetingLink}
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full border border-emerald-200">Auto-Generated</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Notes</label>
               <textarea
@@ -215,18 +243,30 @@ const AppointmentModal = ({ isOpen, onClose, patientId = null, doctorId = null, 
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {app.type === 'Video Call' && app.status === 'confirmed' && (
+                      {(app.status === 'confirmed' || app.status === 'scheduled') && (
                         <div className="flex flex-col items-center gap-2">
-                          <button
-                            onClick={() => {
-                              onJoinCall?.(`Gati_Session_${app.id}`);
-                              onClose();
-                            }}
-                            className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] active:scale-95 flex items-center gap-2"
-                          >
-                            <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                            Join Now
-                          </button>
+                          {app.meetingLink ? (
+                            <a
+                              href={app.meetingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] active:scale-95 flex items-center gap-2 no-underline"
+                            >
+                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                              Join Meet
+                            </a>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                onJoinCall?.(`Gati_Session_${app.id}`);
+                                onClose();
+                              }}
+                              className="px-6 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] active:scale-95 flex items-center gap-2"
+                            >
+                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                              Join Now
+                            </button>
+                          )}
                         </div>
                       )}
                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border ${app.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white text-slate-500 border-slate-100'}`}>

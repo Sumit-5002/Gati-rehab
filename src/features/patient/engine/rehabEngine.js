@@ -80,7 +80,7 @@ export const calculateDailyPlan = (profile, painLogs = [], sessionHistory = []) 
     date: new Date().toISOString(),
     status,
     reasoning,
-    exercises: finalPlan,
+    exercises: finalPlan.slice(0, 4), // Cap at 4 exercises for better dashboard UX
     intensityAdjustment
   };
 };

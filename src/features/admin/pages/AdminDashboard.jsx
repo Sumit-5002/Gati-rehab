@@ -1,53 +1,167 @@
-
 import { useState, useEffect } from 'react';
 import {
   Users,
-  Activity,
   Shield,
   Database,
-  Server,
-  AlertCircle,
-  TrendingUp,
-  Settings,
   Search,
   CheckCircle,
-  XCircle
+  XCircle,
+  User as UserIcon,
+  Stethoscope,
+  Edit2,
+  Save,
+  X,
+  Loader2,
+  Trash2,
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 import NavHeader from '../../../shared/components/NavHeader';
 import { useAuth } from '../../auth/context/AuthContext';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import AdminSettingsModal from '../components/modals/AdminSettingsModal';
 import { db } from '../../../lib/firebase/config';
 
 const AdminDashboard = () => {
   const { userData: _ } = useAuth();
   const [stats, setStats] = useState({
     totalUsers: 0,
+    patients: 0,
+    doctors: 0,
     activeSessions: 0,
     systemHealth: 'Optimal',
-    dbSize: '1.2 GB'
+    dbSize: '24.5 MB'
   });
+  const [users, setUsers] = useState([]);
+  const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Editing state
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
+
+  // Add Doctor State
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+  const [newDoctor, setNewDoctor] = useState({ name: '', email: '', specialty: '' });
+  const [isAddingDoctor, setIsAddingDoctor] = useState(false);
+
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      const usersRef = collection(db, 'users');
+      // Removed orderBy to prevent missing index errors
+      const snapshot = await getDocs(usersRef);
+
+      const userList = [];
+      const doctorList = [];
+      let patientCount = 0;
+      let doctorCount = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const userObj = { id: doc.id, ...data };
+        userList.push(userObj);
+
+        if (data.userType === 'doctor') {
+          doctorCount++;
+          doctorList.push(userObj);
+        } else {
+          patientCount++;
+        }
+      });
+
+      // Get active sessions (approximate by recent timeframe not possible without complex query, simulating based on users)
+      const activeCount = Math.floor(patientCount * 0.2);
+
+      setUsers(userList);
+      setDoctors(doctorList);
+      setStats(prev => ({
+        ...prev,
+        totalUsers: userList.length,
+        patients: patientCount,
+        doctors: doctorCount,
+        activeSessions: activeCount
+      }));
+
+      setLoading(false);
+    } catch (err) {
+      console.error('[AdminDashboard] Error fetching data:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // Settings state
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const fetchAdminStats = async () => {
-      try {
-        await getDocs(query(collection(db, 'users'), limit(1)));
-        // Simulate counting for free tier efficiency
-        setStats({
-          totalUsers: 142,
-          activeSessions: 12,
-          systemHealth: 'Optimal',
-          dbSize: '24.5 MB'
-        });
-        setLoading(false);
-      } catch (error) {
-        console.error('[AdminDashboard] Error fetching stats:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchAdminStats();
+    fetchAdminData();
   }, []);
+
+  const handleAssignDoctor = async (userId) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        doctorId: selectedDoctorId
+      });
+      setEditingUserId(null);
+      fetchAdminData(); // Refresh the list
+    } catch (err) {
+      console.error('Error assigning doctor:', err);
+      alert('Failed to assign doctor');
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      fetchAdminData(); // Refresh list
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Failed to delete user');
+    }
+  };
+
+  const handleAddDoctorSubmit = async (e) => {
+    e.preventDefault();
+    if (!newDoctor.name || !newDoctor.email) {
+      alert('Name and Email are required');
+      return;
+    }
+
+    setIsAddingDoctor(true);
+    try {
+      await addDoc(collection(db, 'users'), {
+        name: newDoctor.name,
+        email: newDoctor.email,
+        specialty: newDoctor.specialty || 'General',
+        userType: 'doctor',
+        createdAt: serverTimestamp(),
+        isInvite: true // Flag to indicate invite status
+      });
+
+      // Reset and close
+      setNewDoctor({ name: '', email: '', specialty: '' });
+      setShowAddDoctor(false);
+      setIsAddingDoctor(false);
+      fetchAdminData();
+      alert(`Doctor invited! They must Sign Up with ${newDoctor.email} to access the portal.`);
+    } catch (err) {
+      console.error('Error adding doctor:', err);
+      alert('Failed to add doctor');
+      setIsAddingDoctor(false);
+    }
+  };
+
+  const filteredUsers = users.filter(user =>
+    (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.userType?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -59,7 +173,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] pb-20">
-      <NavHeader userType="admin" />
+      <NavHeader userType="admin" onSettingsClick={() => setSettingsOpen(true)} />
 
       <main className="max-w-[1400px] mx-auto px-4 py-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
@@ -74,83 +188,203 @@ const AdminDashboard = () => {
           </div>
 
           <div className="flex gap-4">
-            <button className="px-6 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all">
-              System Logs
-            </button>
-            <button className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800 transition-all">
-              Maintenance Mode
+            <button
+              onClick={() => setShowAddDoctor(true)}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg shadow-blue-200 hover:bg-blue-500 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" /> Add Doctor
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 border border-red-100 font-bold">
+            Error loading data: {error}
+          </div>
+        )}
 
         {/* Global Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <AdminStatCard icon={<Users className="w-6 h-6" />} title="Total Users" value={stats.totalUsers} color="blue" />
-          <AdminStatCard icon={<Activity className="w-6 h-6" />} title="Active Sessions" value={stats.activeSessions} color="emerald" />
-          <AdminStatCard icon={<Server className="w-6 h-6" />} title="System Status" value={stats.systemHealth} color="indigo" />
+          <AdminStatCard icon={<Stethoscope className="w-6 h-6" />} title="Doctors" value={stats.doctors} color="emerald" />
+          <AdminStatCard icon={<UserIcon className="w-6 h-6" />} title="Patients" value={stats.patients} color="indigo" />
           <AdminStatCard icon={<Database className="w-6 h-6" />} title="Database Size" value={stats.dbSize} color="orange" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           {/* User Management List */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="space-y-8">
             <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-white">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-black text-slate-900">Recent Users</h3>
+                <h3 className="text-xl font-black text-slate-900">User Directory</h3>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search UID..."
-                    className="pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold"
+                    placeholder="Search users..."
+                    className="pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold w-64"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <UserRow name="Rajesh Kumar" role="Patient" status="Active" />
-                <UserRow name="Dr. Priya Sharma" role="Doctor" status="Active" />
-                <UserRow name="Amit Patel" role="Patient" status="Inactive" />
-                <UserRow name="Sunita Reddy" role="Patient" status="Active" />
-              </div>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                {filteredUsers.map(user => (
+                  <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${user.userType === 'doctor' ? 'bg-teal-50 text-teal-600' : 'bg-blue-50 text-blue-600'}`}>
+                        {user.userType === 'doctor' ? <Stethoscope className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          {user.name || 'Unnamed'}
+                          {user.isInvite && <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider">Invite</span>}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">{user.userType} • {user.email}</p>
+                        {user.userType === 'patient' && (
+                          <p className="text-[10px] text-blue-500 font-bold mt-1">
+                            Assigned Doctor: {doctors.find(d => d.id === user.doctorId)?.name || 'None'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-              <button className="w-full mt-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all">
-                View All Directory
-              </button>
-            </div>
-          </div>
+                    <div className="flex items-center gap-2">
+                      {user.userType === 'patient' && (
+                        editingUserId === user.id ? (
+                          <div className="flex items-center gap-2 animate-in fade-in">
+                            <select
+                              className="text-xs p-2 rounded-lg border-2 border-slate-200 bg-white font-bold outline-none focus:border-blue-500 transition-colors"
+                              value={selectedDoctorId}
+                              onChange={(e) => setSelectedDoctorId(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="">Select Doctor</option>
+                              {doctors.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAssignDoctor(user.id);
+                              }}
+                              className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 shadow-md shadow-emerald-200"
+                            >
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingUserId(null);
+                              }}
+                              className="p-2 bg-slate-200 text-slate-500 rounded-lg hover:bg-slate-300"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingUserId(user.id);
+                              setSelectedDoctorId(user.doctorId || '');
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" /> Assign Doctor
+                          </button>
+                        )
+                      )}
 
-          {/* System Health */}
-          <div className="lg:col-span-1 space-y-8">
-            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-900/40">
-              <h3 className="text-lg font-black mb-6">Service Availability</h3>
-              <div className="space-y-6">
-                <ServiceStatus name="Authentication" status="up" />
-                <ServiceStatus name="Firestore DB" status="up" />
-                <ServiceStatus name="Cloud Storage" status="up" />
-                <ServiceStatus name="MediaPipe Engine" status="up" />
-                <ServiceStatus name="AI Analytics" status="degraded" />
+                      {user.userType !== 'admin' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteUser(user.id, user.name);
+                          }}
+                          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete User"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <p className="text-center py-8 text-slate-400 font-bold">No users found.</p>
+                )}
               </div>
-            </div>
-
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-white">
-              <h3 className="text-lg font-black text-slate-900 mb-4">Security Overview</h3>
-              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl mb-4">
-                <div className="flex items-center gap-2 text-rose-600 mb-1">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs font-black uppercase">Recent Alert</span>
-                </div>
-                <p className="text-xs font-bold text-slate-600 leading-relaxed">
-                  3 failed login attempts from IP: 192.168.1.42 detected.
-                </p>
-              </div>
-              <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-500 transition-all">
-                Audit Security Logs
-              </button>
             </div>
           </div>
         </div>
+
+        {/* Add Doctor Modal Overlay */}
+        {showAddDoctor && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddDoctor(false)} />
+            <div className="relative bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-black text-slate-900">Add New Doctor</h3>
+                <button onClick={() => setShowAddDoctor(false)} className="p-2 hover:bg-slate-100 rounded-xl">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddDoctorSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase ml-2">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Dr. Jane Doe"
+                    className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 border-none focus:ring-2 focus:ring-blue-100 outline-none"
+                    value={newDoctor.name}
+                    onChange={e => setNewDoctor({ ...newDoctor, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase ml-2">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="doctor@hospital.com"
+                    className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 border-none focus:ring-2 focus:ring-blue-100 outline-none"
+                    value={newDoctor.email}
+                    onChange={e => setNewDoctor({ ...newDoctor, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-400 uppercase ml-2">Specialty</label>
+                  <input
+                    type="text"
+                    placeholder="Orthopedics"
+                    className="w-full p-4 bg-slate-50 rounded-2xl font-bold text-slate-900 border-none focus:ring-2 focus:ring-blue-100 outline-none"
+                    value={newDoctor.specialty}
+                    onChange={e => setNewDoctor({ ...newDoctor, specialty: e.target.value })}
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={isAddingDoctor}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isAddingDoctor ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+                    Send Invite
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      <AdminSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };
@@ -173,58 +407,5 @@ const AdminStatCard = ({ icon, title, value, color }) => {
     </div>
   );
 };
-
-const UserRow = ({ name, role, status }) => (
-  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg transition-all cursor-pointer">
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-        <User className="w-5 h-5 text-slate-300" />
-      </div>
-      <div>
-        <p className="text-sm font-black text-slate-900">{name}</p>
-        <p className="text-[10px] font-bold text-slate-400 uppercase">{role}</p>
-      </div>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full ${status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-      <span className="text-[10px] font-black uppercase text-slate-500">{status}</span>
-    </div>
-  </div>
-);
-
-const ServiceStatus = ({ name, status }) => (
-  <div className="flex items-center justify-between">
-    <span className="text-sm font-bold text-slate-300">{name}</span>
-    <div className="flex items-center gap-2">
-      {status === 'up' ? (
-        <>
-          <span className="text-[10px] font-black uppercase text-emerald-400">Stable</span>
-          <CheckCircle className="w-4 h-4 text-emerald-400" />
-        </>
-      ) : (
-        <>
-          <span className="text-[10px] font-black uppercase text-orange-400">Degraded</span>
-          <XCircle className="w-4 h-4 text-orange-400" />
-        </>
-      )}
-    </div>
-  </div>
-);
-
-const User = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 
 export default AdminDashboard;

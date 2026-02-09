@@ -6,9 +6,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const TrendsModal = ({ isOpen, onClose, patientId }) => {
     const [trends, setTrends] = useState({ romData: [], qualityData: [] });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const fetchTrends = async () => {
+            setLoading(true);
             try {
                 const data = await getTrendData(patientId);
                 // Fallback dummy data if nothing exists yet to show the UI
@@ -37,6 +39,8 @@ const TrendsModal = ({ isOpen, onClose, patientId }) => {
                 });
             } catch (error) {
                 console.error("Trends Fetch Error:", error);
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -137,10 +141,26 @@ const TrendsModal = ({ isOpen, onClose, patientId }) => {
 
                         {/* Insight Stats */}
                         <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-6">
-                            <InsightCard label="Best Day" value="Sunday" icon={<Target className="text-blue-500" />} />
-                            <InsightCard label="Avg. Quality" value="89%" icon={<Zap className="text-emerald-500" />} />
-                            <InsightCard label="ROM Peak" value="72°" icon={<Activity className="text-indigo-500" />} />
-                            <InsightCard label="Consistency" value="94%" icon={<TrendingUp className="text-orange-500" />} />
+                            <InsightCard
+                                label="Best Day"
+                                value={trends.qualityData.length > 0 ? [...trends.qualityData].sort((a, b) => b.value - a.value)[0].day : 'N/A'}
+                                icon={<Target className="text-blue-500" />}
+                            />
+                            <InsightCard
+                                label="Avg. Quality"
+                                value={`${Math.round(trends.qualityData.reduce((acc, curr) => acc + curr.value, 0) / (trends.qualityData.length || 1))}%`}
+                                icon={<Zap className="text-emerald-500" />}
+                            />
+                            <InsightCard
+                                label="ROM Peak"
+                                value={`${Math.max(...trends.romData.map(d => d.value), 0)}°`}
+                                icon={<Activity className="text-indigo-500" />}
+                            />
+                            <InsightCard
+                                label="Consistency"
+                                value={`${Math.round((trends.qualityData.length / 7) * 100)}%`}
+                                icon={<TrendingUp className="text-orange-500" />}
+                            />
                         </div>
                     </div>
                 </div>

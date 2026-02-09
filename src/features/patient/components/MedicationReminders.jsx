@@ -18,7 +18,27 @@ const MedicationReminders = () => {
     const q = query(collection(db, 'medications'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const meds = [];
-      snapshot.forEach((doc) => meds.push({ id: doc.id, ...doc.data() }));
+      const today = new Date();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+
+        // Filter out expired medications based on duration
+        let isExpired = false;
+        if (data.startDate && data.duration) {
+          const start = data.startDate.toDate ? data.startDate.toDate() : new Date(data.startDate);
+          const diffTime = today - start;
+          const diffDays = diffTime / (1000 * 60 * 60 * 24);
+          // If passed duration days, don't show
+          if (diffDays > data.duration) {
+            isExpired = true;
+          }
+        }
+
+        if (!isExpired) {
+          meds.push({ id: doc.id, ...data });
+        }
+      });
       setReminders(meds);
       setLoading(false);
     });
@@ -35,6 +55,8 @@ const MedicationReminders = () => {
         userId: user.uid,
         ...newMed,
         takenToday: false,
+        lastTakenDate: null,
+        startDate: new Date(),
         createdAt: serverTimestamp()
       });
       setNewMed({ name: '', dosage: '', time: '' });
@@ -44,9 +66,15 @@ const MedicationReminders = () => {
     }
   };
 
-  const toggleTaken = async (id, current) => {
+  const toggleTaken = async (id, lastTakenDate) => {
     try {
-      await updateDoc(doc(db, 'medications', id), { takenToday: !current });
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const isTakenToday = lastTakenDate === todayStr;
+
+      await updateDoc(doc(db, 'medications', id), {
+        lastTakenDate: isTakenToday ? null : todayStr,
+        takenToday: !isTakenToday // Keep legacy field synced just in case
+      });
     } catch (err) {
       console.error('Error updating med:', err);
     }
@@ -84,7 +112,7 @@ const MedicationReminders = () => {
             placeholder="Medication Name"
             className="w-full px-4 py-2 rounded-xl border-none text-sm font-bold focus:ring-2 focus:ring-rose-200"
             value={newMed.name}
-            onChange={e => setNewMed({...newMed, name: e.target.value})}
+            onChange={e => setNewMed({ ...newMed, name: e.target.value })}
           />
           <div className="flex gap-2">
             <input
@@ -92,13 +120,13 @@ const MedicationReminders = () => {
               placeholder="Dosage"
               className="flex-1 px-4 py-2 rounded-xl border-none text-sm font-bold focus:ring-2 focus:ring-rose-200"
               value={newMed.dosage}
-              onChange={e => setNewMed({...newMed, dosage: e.target.value})}
+              onChange={e => setNewMed({ ...newMed, dosage: e.target.value })}
             />
             <input
               type="time"
               className="flex-1 px-4 py-2 rounded-xl border-none text-sm font-bold focus:ring-2 focus:ring-rose-200"
               value={newMed.time}
-              onChange={e => setNewMed({...newMed, time: e.target.value})}
+              onChange={e => setNewMed({ ...newMed, time: e.target.value })}
             />
           </div>
           <div className="flex gap-2">
@@ -109,30 +137,35 @@ const MedicationReminders = () => {
       )}
 
       <div className="space-y-3">
-        {reminders.map((med) => (
-          <div key={med.id} className="group flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => toggleTaken(med.id, med.takenToday)}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${med.takenToday ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white text-slate-300 border border-slate-100'}`}
-              >
-                <CheckCircle2 className="w-5 h-5" />
-              </button>
-              <div>
-                <p className={`text-sm font-black transition-all ${med.takenToday ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{med.name}</p>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
-                  <Clock className="w-3 h-3" /> {med.time} • {med.dosage}
+        {reminders.map((med) => {
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const isTaken = med.lastTakenDate === todayStr;
+
+          return (
+            <div key={med.id} className="group flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleTaken(med.id, med.lastTakenDate)}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isTaken ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white text-slate-300 border border-slate-100'}`}
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                </button>
+                <div>
+                  <p className={`text-sm font-black transition-all ${isTaken ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{med.name}</p>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
+                    <Clock className="w-3 h-3" /> {med.time} • {med.dosage}
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => handleDelete(med.id)}
+                className="p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={() => handleDelete(med.id)}
-              className="p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+          )
+        })}
         {reminders.length === 0 && !loading && (
           <div className="py-6 text-center text-slate-400 font-bold text-sm italic">
             No active medications

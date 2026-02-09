@@ -10,9 +10,22 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function getUserType() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+        (getUserType() == 'admin' || getUserRole() == 'admin');
+    }
+
+    function isDoctor() {
+      return isAuthenticated() &&
+        (getUserType() == 'doctor' || getUserRole() == 'doctor');
     }
 
     function isDoctorOf(patientId) {
@@ -31,6 +44,7 @@ service cloud.firestore {
         data.patientId == request.auth.uid || 
         data.senderId == request.auth.uid ||
         data.receiverId == request.auth.uid ||
+        data.recipientId == request.auth.uid ||
         (data.participants != null && request.auth.uid in data.participants)
       );
     }
@@ -38,10 +52,7 @@ service cloud.firestore {
     // 1. Users collection 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || (
-        isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'doctor'
-      );
+      allow write: if isOwner(userId) || isDoctor() || isAdmin();
     }
     
     // 2. Routines Collection
@@ -78,7 +89,7 @@ service cloud.firestore {
       );
       allow update, delete: if isAuthenticated() && (
         resource.data.patientId == request.auth.uid || 
-        (resource.data.userId == request.auth.uid && resource.data.patientId == null) ||
+        (resource.data.userId == request.auth.uid && request.resource.data.patientId == null) ||
         isAdmin()
       );
     }
@@ -156,6 +167,12 @@ service cloud.firestore {
     // 11. Doctor Patients relationship matching
     match /doctor_patients/{doctorId}/patients/{patientId} {
       allow read, write: if request.auth.uid == doctorId || isOwner(patientId) || isAdmin();
+    }
+
+    // 12. Notifications collection
+    match /notifications/{notificationId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isDocOwner(resource.data) || isAdmin();
     }
   }
 }

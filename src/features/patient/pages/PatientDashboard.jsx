@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Play,
@@ -32,21 +32,22 @@ import {
   ChevronLeft,
   Share2,
   Download,
-  Filter
+  Filter,
+  UserCircle
 } from 'lucide-react';
 import NavHeader from '../../../shared/components/NavHeader';
 import Footer from '../../../shared/components/Footer';
 import SessionReport from '../components/SessionReport';
 import PainTracker from '../components/PainTracker';
 
-// import PainLoggerModal from '../components/modals/PainLoggerModal'; // Removed as merged into widget
-import PatientSettingsModal from '../components/modals/PatientSettingsModal';
-import NeuralChatModal from '../../doctor/components/modals/NeuralChatModal';
-import AppointmentModal from '../../../shared/components/modals/AppointmentModal';
-import PlanOverviewModal from '../components/modals/PlanOverviewModal';
-import TrendsModal from '../components/modals/TrendsModal';
-import VideoConsultationModal from '../../../shared/components/modals/VideoConsultationModal';
-import MedicationReminders from '../components/MedicationReminders';
+// Lazy load modals for performance
+const PatientSettingsModal = lazy(() => import('../components/modals/PatientSettingsModal'));
+const NeuralChatModal = lazy(() => import('../../doctor/components/modals/NeuralChatModal'));
+const AppointmentModal = lazy(() => import('../../../shared/components/modals/AppointmentModal'));
+const PlanOverviewModal = lazy(() => import('../components/modals/PlanOverviewModal'));
+const TrendsModal = lazy(() => import('../components/modals/TrendsModal'));
+const VideoConsultationModal = lazy(() => import('../../../shared/components/modals/VideoConsultationModal'));
+const MedicationReminders = lazy(() => import('../components/MedicationReminders'));
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
 import {
@@ -58,6 +59,8 @@ import {
   getPainHistory
 } from '../services/patientService';
 import { calculateDailyPlan } from '../engine/rehabEngine';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../lib/firebase/config';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -74,6 +77,7 @@ const PatientDashboard = () => {
   const [todayRoutine, setTodayRoutine] = useState([]);
   const [aiPlan, setAiPlan] = useState(null);
   const [recentSessions, setRecentSessions] = useState([]);
+  const [upcomingAppts, setUpcomingAppts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -97,7 +101,7 @@ const PatientDashboard = () => {
 
     const fetchData = async () => {
       try {
-        const [statsData, _, sessionsData, painData] = await Promise.all([
+        const [statsData, todayData, sessionsData, painData] = await Promise.all([
           getPatientStats(user.uid),
           getTodayRoutine(user.uid),
           getRecentSessions(user.uid, 4),
@@ -107,7 +111,7 @@ const PatientDashboard = () => {
         setStats(statsData);
         setRecentSessions(sessionsData);
 
-        // Run AI Decision Engine
+        // Run AI Decision Engine as a fallback/advisory
         const generatedPlan = calculateDailyPlan(
           {
             injuryType: userData?.injuryType || 'General Recovery',
@@ -118,7 +122,13 @@ const PatientDashboard = () => {
         );
 
         setAiPlan(generatedPlan);
-        setTodayRoutine(generatedPlan.exercises);
+
+        // Priority: 1. Official Doctor Routine, 2. AI Generated Plan
+        if (todayData && todayData.length > 0) {
+          setTodayRoutine(todayData);
+        } else {
+          setTodayRoutine(generatedPlan.exercises);
+        }
 
         setLoading(false);
       } catch (error) {
@@ -144,9 +154,21 @@ const PatientDashboard = () => {
       setStats(prev => ({ ...prev, completed: weeklyCount }));
     });
 
+    // Real-time appointments
+    const apptsQuery = query(
+      collection(db, 'appointments'),
+      where('patientId', '==', user.uid),
+      where('status', '==', 'scheduled')
+    );
+    const unsubAppts = onSnapshot(apptsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUpcomingAppts(data.sort((a, b) => new Date(a.date) - new Date(b.date)));
+    });
+
     return () => {
       unsubPatient();
       unsubWeekly();
+      unsubAppts();
     };
   }, [user, userData?.injuryType, userData?.rehabPhase]);
 
@@ -242,8 +264,8 @@ const PatientDashboard = () => {
               <div className="flex flex-col items-center justify-center">
                 {/* Circular Progress Indicator */}
                 <div className="relative w-64 h-64 sm:w-80 sm:h-80 group cursor-default">
-                  <div className="absolute inset-0 bg-blue-500/5 rounded-full blur-[40px] group-hover:bg-blue-500/20 transition-all duration-700"></div>
-                  <svg className="w-full h-full transform -rotate-90 filter drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                  <div className="absolute inset-0 bg-blue-500/5 rounded-full transition-all duration-700"></div>
+                  <svg className="w-full h-full transform -rotate-90">
                     {/* Background Ring */}
                     <circle cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="16" fill="transparent" className="text-white/5" />
                     {/* Glowing Progress Ring */}
@@ -253,7 +275,7 @@ const PatientDashboard = () => {
                       strokeLinecap="round"
                       className="text-blue-500 transition-all duration-1000 ease-out" />
                     {/* Secondary inner ring for depth */}
-                    <circle cx="50%" cy="50%" r="35%" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-white/10" strokeDasharray="5,10" />
+                    <circle cx="50%" cy="50%" r="35%" stroke="currentColor" strokeWidth="1" fill="transparent" className="text-white/10" strokeDasharray="5,10" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <div className="text-center">
@@ -279,8 +301,8 @@ const PatientDashboard = () => {
                   <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">Today's Roadmap</h3>
                   {aiPlan?.status && (
                     <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${aiPlan.status === 'Progressing' ? 'bg-emerald-100 text-emerald-600' :
-                        aiPlan.status === 'Regressing' ? 'bg-rose-100 text-rose-600' :
-                          'bg-blue-100 text-blue-600'
+                      aiPlan.status === 'Regressing' ? 'bg-rose-100 text-rose-600' :
+                        'bg-blue-100 text-blue-600'
                       }`}>
                       AI: {aiPlan.status}
                     </span>
@@ -290,8 +312,8 @@ const PatientDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 {todayRoutine.length > 0 && (
-                  <span className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                    {todayRoutine.filter(ex => ex.completed).length}/{todayRoutine.length} Done
+                  <span className="px-5 py-2 bg-blue-600 text-white rounded-full text-xs font-black uppercase tracking-[0.1em] shadow-lg shadow-blue-200">
+                    {todayRoutine.filter(ex => ex.completed).length}/{todayRoutine.length} ROADMAP COMPLETE
                   </span>
                 )}
               </div>
@@ -323,8 +345,8 @@ const PatientDashboard = () => {
                     {ex.completed ? <CheckCircle className="w-6 h-6" /> : <Play className="w-5 h-5 ml-0.5 fill-blue-600" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-slate-900 truncate">{ex.name}</p>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{ex.sets} Sets • {ex.reps} Reps</p>
+                    <p className="text-lg font-black text-slate-900 truncate">{ex.name}</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">{ex.sets} Sets • {ex.reps} Reps</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
                 </div>
@@ -332,7 +354,7 @@ const PatientDashboard = () => {
             </div>
             {todayRoutine.length === 0 && (
               <div className="text-center py-10 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
-                <p className="text-slate-500 font-bold">Your routine is currently being updated by Dr. Gati.</p>
+                <p className="text-slate-500 font-bold">Your routine is currently being updated by {userData?.doctorName || 'Dr. Gati'}.</p>
               </div>
             )}
           </div>
@@ -342,22 +364,22 @@ const PatientDashboard = () => {
             <StatCard
               icon={<Activity className="w-6 h-6" />}
               title="ADHERENCE"
-              value={`${stats.adherenceRate || 85}%`}
-              trend="+5%"
+              value={`${stats.adherenceRate || Math.round((stats.completed / (stats.weeklyGoal || 5)) * 100)}%`}
+              trend={stats.adherenceRate > 80 ? "+Increased" : "Stable"}
               color="blue"
             />
             <StatCard
               icon={<Calendar className="w-6 h-6" />}
               title="GOAL PROGRESS"
               value={`${stats.completed}/${stats.weeklyGoal}`}
-              trend="On track"
+              trend={stats.completed >= stats.weeklyGoal ? "Goal Met!" : "On track"}
               color="indigo"
             />
             <StatCard
               icon={<Star className="w-6 h-6" />}
               title="QUALITY"
-              value="A+"
-              trend="Top 5%"
+              value={userData?.lastSessionQuality >= 90 ? "A+" : userData?.lastSessionQuality >= 80 ? "A" : userData?.lastSessionQuality >= 70 ? "B" : "C"}
+              trend={`${userData?.lastSessionQuality || 0}% Score`}
               color="emerald"
             />
           </div>
@@ -413,6 +435,71 @@ const PatientDashboard = () => {
             <PainTracker />
           </div>
 
+          {/* Upcoming Sessions Card */}
+          {upcomingAppts.length > 0 && (
+            <div className="bg-white rounded-[3rem] p-8 sm:p-12 shadow-xl shadow-slate-200/40 border border-slate-100 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center border border-indigo-100 shadow-sm shrink-0">
+                    <Calendar className="w-10 h-10 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-1">Upcoming Session</p>
+                    <h3 className="text-3xl font-black text-slate-900 leading-tight">
+                      {upcomingAppts[0].type} with {userData?.doctorName || 'Specialist'}
+                    </h3>
+                    <p className="text-slate-500 font-bold">
+                      {new Date(upcomingAppts[0].date).toLocaleDateString()} at {upcomingAppts[0].time}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <a
+                    href={upcomingAppts[0].meetingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 md:flex-none px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100 no-underline"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                    Join Consultation
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Your Specialist Section */}
+          <div className="bg-white rounded-[3rem] p-8 sm:p-12 shadow-xl shadow-slate-200/40 border border-slate-100">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center border border-blue-100 shadow-sm shrink-0">
+                  <UserCircle className="w-10 h-10 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-1">Your Specialist</p>
+                  <h3 className="text-3xl font-black text-slate-900 leading-tight">
+                    {userData?.doctorName || 'Dr. Gati (Default)'}
+                  </h3>
+                  <p className="text-slate-500 font-bold">Leading Physical Rehabilitation Specialist</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <button
+                  onClick={() => setChatOpen(true)}
+                  className="flex-1 md:flex-none px-8 py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                >
+                  <MessageSquare className="w-5 h-5 text-blue-400" /> Message
+                </button>
+                <button
+                  onClick={() => setAppointmentOpen(true)}
+                  className="flex-1 md:flex-none px-8 py-4 bg-blue-50 text-blue-600 rounded-2xl font-black hover:bg-blue-100 transition-all border border-blue-100 flex items-center justify-center gap-2"
+                >
+                  <Calendar className="w-5 h-5" /> Schedule
+                </button>
+              </div>
+            </div>
+          </div>
+
           <MedicationReminders />
 
           {/* Neural Insights Integration */}
@@ -427,7 +514,12 @@ const PatientDashboard = () => {
                   <p className="text-blue-400 text-xs font-black uppercase tracking-widest leading-none">Diagnostic Update</p>
                 </div>
                 <p className="text-slate-200 font-bold leading-relaxed italic text-lg sm:text-2xl">
-                  "Your motor precision in the last session was <span className="text-blue-400">excellent</span>. We recommend increasing your flexion angle by 5° tomorrow."
+                  {userData?.lastSessionQuality >= 80
+                    ? `"Your motor precision in the last session was excellent. We recommend ${aiPlan?.status === 'Regressing' ? 'slowing down to maintain control' : 'maintaining this intensity'}."`
+                    : userData?.lastSessionQuality > 0
+                      ? `"We've detected some instability in your movement patterns. Focus on slower repetitions in your next session to improve motor control."`
+                      : `"Welcome back. Start your session to receive real-time neural-motor analysis and personalized recovery insights."`
+                  }
                 </p>
                 <button
                   onClick={() => setChatOpen(true)}
@@ -445,57 +537,57 @@ const PatientDashboard = () => {
         </div>
       </main>
 
-      <PlanOverviewModal
-        isOpen={planOpen}
-        onClose={() => setPlanOpen(false)}
-        routine={aiPlan}
-      />
+      <Suspense fallback={null}>
+        <PlanOverviewModal
+          isOpen={planOpen}
+          onClose={() => setPlanOpen(false)}
+          routine={aiPlan}
+        />
 
+        <PatientSettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          patientProfile={userData}
+          onSave={handleSettingsUpdate}
+        />
 
+        <NeuralChatModal
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+          chatPartnerId={userData?.doctorId}
+          chatPartnerName={userData?.doctorName || 'Your Doctor'}
+        />
 
-      <PatientSettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        patientProfile={userData}
-        onSave={handleSettingsUpdate}
-      />
+        <AppointmentModal
+          isOpen={appointmentOpen}
+          onClose={() => setAppointmentOpen(false)}
+          patientId={user?.uid}
+          patientName={userData?.name}
+          doctorId={userData?.doctorId}
+          doctorName={userData?.doctorName}
+          onJoinCall={(room) => {
+            setSelectedRoom(room);
+            setVideoOpen(true);
+          }}
+        />
 
-      <NeuralChatModal
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-        chatPartnerId={userData?.doctorId}
-        chatPartnerName={userData?.doctorName || 'Your Doctor'}
-      />
+        <VideoConsultationModal
+          isOpen={videoOpen}
+          onClose={() => setVideoOpen(false)}
+          roomName={selectedRoom || `GatiRehab_${user?.uid?.substring(0, 8)}`}
+        />
 
-      <AppointmentModal
-        isOpen={appointmentOpen}
-        onClose={() => setAppointmentOpen(false)}
-        patientId={user?.uid}
-        patientName={userData?.name}
-        doctorId={userData?.doctorId}
-        doctorName={userData?.doctorName}
-        onJoinCall={(room) => {
-          setSelectedRoom(room);
-          setVideoOpen(true);
-        }}
-      />
-
-      <VideoConsultationModal
-        isOpen={videoOpen}
-        onClose={() => setVideoOpen(false)}
-        roomName={selectedRoom || `GatiRehab_${user?.uid?.substring(0, 8)}`}
-      />
-
-      <TrendsModal
-        isOpen={trendsOpen}
-        onClose={() => setTrendsOpen(false)}
-        patientId={user?.uid}
-      />
+        <TrendsModal
+          isOpen={trendsOpen}
+          onClose={() => setTrendsOpen(false)}
+          patientId={user?.uid}
+        />
+      </Suspense>
     </div >
   );
 };
 
-const StatCard = ({ icon, title, value, trend, color }) => {
+const StatCard = memo(({ icon, title, value, trend, color }) => {
   const colorStyles = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
     indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
@@ -504,22 +596,22 @@ const StatCard = ({ icon, title, value, trend, color }) => {
 
   return (
     <div className="group relative bg-white p-6 sm:p-10 rounded-[3.5rem] border border-slate-50 shadow-[0_10px_30px_rgba(0,0,0,0.03)] transition-all hover:shadow-[0_20px_60px_rgba(0,0,0,0.08)] hover:-translate-y-2 overflow-hidden">
-      <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity ${color === 'emerald' ? 'bg-emerald-600' : 'bg-blue-600'}`}></div>
+      <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-xl opacity-10 group-hover:opacity-20 transition-opacity ${color === 'emerald' ? 'bg-emerald-600' : 'bg-blue-600'}`}></div>
       <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-[2rem] flex items-center justify-center mb-8 sm:mb-10 transition-all group-hover:scale-110 group-hover:rotate-6 ${colorStyles[color]} border shadow-inner`}>
         {icon}
       </div>
-      <p className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2 leading-none">{title}</p>
+      <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">{title}</p>
       <div className="flex items-baseline gap-3">
         <p className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${color === 'emerald' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'} text-[10px] font-black uppercase tracking-wider`}>
-          <TrendingUp className="w-3 h-3" /> {trend}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${color === 'emerald' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'} text-xs font-black uppercase tracking-wider`}>
+          <TrendingUp className="w-4 h-4" /> {trend}
         </div>
       </div>
     </div>
   );
-};
+});
 
-const ActionTile = ({ icon, label, color, onClick }) => {
+const ActionTile = memo(({ icon, label, color, onClick }) => {
   const styles = {
     blue: 'text-blue-600 border-blue-100 bg-blue-50/50 hover:border-blue-300 hover:shadow-blue-50',
     rose: 'text-rose-600 border-rose-100 bg-rose-50/50 hover:border-rose-300 hover:shadow-rose-50',
@@ -544,12 +636,12 @@ const ActionTile = ({ icon, label, color, onClick }) => {
       <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all ${iconColors[color]} text-white`}>
         {icon}
       </div>
-      <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-slate-700 text-center px-4 leading-tight group-hover:text-slate-900 transition-colors">{label}</span>
+      <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-700 text-center px-4 leading-tight group-hover:text-slate-900 transition-colors">{label}</span>
 
       {/* Decorative glass effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
     </button>
   );
-};
+});
 
 export default PatientDashboard;

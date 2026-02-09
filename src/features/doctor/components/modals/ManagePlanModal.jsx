@@ -26,7 +26,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
   });
 
   const [meds, setMeds] = useState([]);
-  const [newMed, setNewMed] = useState({ name: '', dosage: '', time: '' });
+  const [newMed, setNewMed] = useState({ name: '', dosage: '', time: '', duration: '7' });
 
   // Load existing routine when modal opens
   useEffect(() => {
@@ -42,10 +42,14 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
   };
 
   const handleAddMed = async () => {
-    if (!newMed.name || !newMed.time) return;
+    if (!newMed.name || !newMed.time || !newMed.duration) return;
     try {
-      await addMedication(patientId, newMed);
-      setNewMed({ name: '', dosage: '', time: '' });
+      await addMedication(patientId, {
+        ...newMed,
+        duration: parseInt(newMed.duration),
+        startDate: new Date()
+      });
+      setNewMed({ name: '', dosage: '', time: '', duration: '7' });
       loadMeds();
     } catch (err) {
       console.error("Error adding med:", err);
@@ -239,7 +243,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                   <Pill className="w-4 h-4 text-rose-500" /> Prescribe Medication
                 </h3>
                 <div className="grid grid-cols-12 gap-3 mb-6">
-                  <div className="col-span-12 md:col-span-5">
+                  <div className="col-span-12 md:col-span-4">
                     <input
                       type="text"
                       placeholder="Medication Name"
@@ -248,7 +252,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                       onChange={(e) => setNewMed({ ...newMed, name: e.target.value })}
                     />
                   </div>
-                  <div className="col-span-12 md:col-span-3">
+                  <div className="col-span-12 md:col-span-2">
                     <input
                       type="text"
                       placeholder="Dosage"
@@ -264,6 +268,19 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                       value={newMed.time}
                       onChange={(e) => setNewMed({ ...newMed, time: e.target.value })}
                     />
+                  </div>
+                  <div className="col-span-12 md:col-span-2">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="Days"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-rose-500 outline-none text-right pr-12"
+                        value={newMed.duration}
+                        onChange={(e) => setNewMed({ ...newMed, duration: e.target.value })}
+                        min="1"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-slate-400">Days</span>
+                    </div>
                   </div>
                   <div className="col-span-12 md:col-span-2">
                     <button

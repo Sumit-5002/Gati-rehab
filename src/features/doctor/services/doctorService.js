@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../../../lib/firebase/config';
 import { logAction } from '../../../shared/services/auditLogger';
+import { sendNotification } from '../../../shared/services/notificationService';
 
 /**
  * Get all patients assigned to a doctor
@@ -21,36 +22,24 @@ import { logAction } from '../../../shared/services/auditLogger';
  */
 export const getDoctorPatients = async (doctorId) => {
   try {
-    const doctorPatientsRef = collection(db, 'doctor_patients', doctorId, 'patients');
-    const snapshot = await getDocs(doctorPatientsRef);
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('doctorId', '==', doctorId));
+    const snapshot = await getDocs(q);
 
-    const patientIds = snapshot.docs.map(doc => doc.id);
-
-    if (patientIds.length === 0) {
-      return [];
-    }
-
-    // Parallel fetch using Promise.all (Fixes N+1 problem)
-    const patientPromises = patientIds.map(id => getDoc(doc(db, 'users', id)));
-    const patientSnapshots = await Promise.all(patientPromises);
-
-    const patients = patientSnapshots
-      .filter(snap => snap.exists())
-      .map(snap => {
-        const data = snap.data();
-        return {
-          id: snap.id,
-          name: data.name || 'Unknown',
-          condition: data.condition || 'N/A',
-          adherenceRate: data.adherenceRate || 0,
-          completedSessions: data.completedSessions || 0,
-          totalSessions: data.totalSessions || 0,
-          lastActive: formatLastActive(data.lastActive),
-          progressLevel: getProgressLevel(data.adherenceRate),
-        };
-      });
-
-    return patients;
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name || 'Unknown',
+        condition: data.condition || 'N/A',
+        adherenceRate: data.adherenceRate || 0,
+        completedSessions: data.completedSessions || 0,
+        totalSessions: data.totalSessions || 0,
+        lastActive: formatLastActive(data.lastActive),
+        progressLevel: getProgressLevel(data.adherenceRate || 0),
+        email: data.email
+      };
+    });
   } catch (error) {
     console.error('[DoctorService] Get patients error:', error);
     return [];
@@ -62,46 +51,38 @@ export const getDoctorPatients = async (doctorId) => {
  * FIX: Optimizes the callback to fetch data in parallel (Fixes Point 3 & 4)
  */
 export const subscribeToDoctorPatients = (doctorId, callback) => {
-  const doctorPatientsRef = collection(db, 'doctor_patients', doctorId, 'patients');
+  const usersRef = collection(db, 'users');
+  const q = query(usersRef, where('doctorId', '==', doctorId));
 
-  return onSnapshot(doctorPatientsRef, async (snapshot) => {
-    const patientIds = [];
+  return onSnapshot(q, (snapshot) => {
+    const patients = [];
     snapshot.forEach((doc) => {
-      patientIds.push(doc.id);
+      const data = doc.data();
+      patients.push({
+        id: doc.id,
+        name: data.name || 'Unknown',
+        condition: data.condition || 'N/A',
+        adherenceRate: data.adherenceRate || 0,
+        completedSessions: data.completedSessions || 0,
+        totalSessions: data.totalSessions || 0,
+        lastActive: formatLastActive(data.lastActive),
+        progressLevel: getProgressLevel(data.adherenceRate || 0),
+        injuryType: data.injuryType || 'General',
+        rehabPhase: data.rehabPhase || 'Assessment'
+      });
     });
 
-    if (patientIds.length === 0) {
-      callback([]);
-      return;
-    }
+    // Sort by last active (most recent first)
+    patients.sort((a, b) => { // Move active users to top
+      if (a.lastActive.includes('min') && !b.lastActive.includes('min')) return -1;
+      if (!a.lastActive.includes('min') && b.lastActive.includes('min')) return 1;
+      return 0;
+    });
 
-    try {
-      // Parallel fetch for real-time list updates
-      const patientPromises = patientIds.map(id => getDoc(doc(db, 'users', id)));
-      const patientSnapshots = await Promise.all(patientPromises);
-
-      const patients = patientSnapshots
-        .filter(snap => snap.exists())
-        .map(snap => {
-          const data = snap.data();
-          return {
-            id: snap.id,
-            name: data.name || 'Unknown',
-            condition: data.condition || 'N/A',
-            adherenceRate: data.adherenceRate || 0,
-            completedSessions: data.completedSessions || 0,
-            totalSessions: data.totalSessions || 0,
-            lastActive: formatLastActive(data.lastActive),
-            progressLevel: getProgressLevel(data.adherenceRate),
-          };
-        });
-
-      callback(patients);
-    } catch (error) {
-      console.error('[DoctorService] Error in subscription callback:', error);
-    }
+    callback(patients);
   }, (error) => {
     console.error('[DoctorService] Subscribe error:', error);
+    callback([]);
   });
 };
 
@@ -365,40 +346,71 @@ export const getROMTrendData = async () => {
  */
 export const addPatientToDoctor = async (doctorId, patientData) => {
   try {
-    // 1. Check if user already exists by email
+    if (!patientData.email) throw new Error("Patient email is required");
+
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', patientData.email));
     const querySnapshot = await getDocs(q);
 
     let patientId;
+    let isNewUser = false;
+
     if (!querySnapshot.empty) {
-      // User exists, use their UID
+      // User exists, update them
       patientId = querySnapshot.docs[0].id;
+      const existingData = querySnapshot.docs[0].data();
+
+      // If already assigned to another doctor, we override (or could throw error)
+      await updateDoc(doc(db, 'users', patientId), {
+        doctorId: doctorId,
+        // Update profile details if they were placeholders
+        name: patientData.name || existingData.name,
+        phoneNumber: patientData.phoneNumber || existingData.phoneNumber || '',
+        condition: patientData.condition || existingData.condition || ''
+      });
     } else {
-      // New user placeholder
-      patientId = doc(collection(db, 'users')).id;
+      // Create new user shell (Invite flow)
+      // We use addDoc to generate an auto-ID since we don't have their UID yet
+      // When they sign up, the Auth UID will be different. Handled by linking or checking email on signup.
+      // Ideally, we wait for them to sign up. But here we create a placeholder.
+      // Actually, standard pattern: Create a doc. When they sign up, we match by email and merge.
+      const newDocRef = await addDoc(collection(db, 'users'), {
+        ...patientData,
+        userType: 'patient',
+        doctorId: doctorId,
+        createdAt: serverTimestamp(),
+        adherenceRate: 0,
+        completedSessions: 0,
+        totalSessions: 0,
+        streak: 0,
+        isInvite: true // Flag to indicate this is a placeholder
+      });
+      patientId = newDocRef.id;
+      isNewUser = true;
     }
 
-    await setDoc(doc(db, 'users', patientId), {
-      ...patientData,
-      userType: 'patient',
-      doctorId: doctorId, // Link the doctor to the patient
-      createdAt: serverTimestamp(),
-      adherenceRate: 0,
-      completedSessions: 0,
-      totalSessions: 0,
-      streak: 0
-    }, { merge: true });
-
+    // Legacy support: Add to doctor_patients subcollection
+    // (We keep this for now to avoid breaking other parts, though main read is from users)
     await setDoc(doc(db, 'doctor_patients', doctorId, 'patients', patientId), {
       assignedAt: serverTimestamp(),
-      active: true
+      active: true,
+      patientEmail: patientData.email
     });
 
-    // Audit log
-    await logAction(doctorId, 'ADD_PATIENT', { patientId, patientName: patientData.name });
+    await logAction(doctorId, 'ADD_PATIENT', { patientId, patientName: patientData.name, isNewUser });
 
-    return { id: patientId, success: true };
+    // Notify patient if they already exist
+    if (!isNewUser) {
+      await sendNotification(patientId, {
+        title: 'New Specialist Assigned',
+        message: 'A physical rehabilitation specialist has been assigned to your care plan.',
+        type: 'info'
+      });
+    }
+
+    console.log('[DoctorService] Add patient result:', { patientId, isNewUser });
+
+    return { id: patientId, success: true, isNewUser };
   } catch (error) {
     console.error('[DoctorService] Add patient error:', error);
     throw error;
@@ -432,6 +444,13 @@ export const updatePatientRoutine = async (patientId, routineData) => {
     const actorId = auth.currentUser?.uid || 'unknown';
     await logAction(actorId, 'UPDATE_ROUTINE', { patientId, updatedBy: 'doctor' });
 
+    // Send notification to patient
+    await sendNotification(patientId, {
+      title: 'Treatment Plan Updated',
+      message: 'Your specialist has updated your rehabilitation routine. Check your new schedule.',
+      type: 'info'
+    });
+
     return { success: true };
   } catch (error) {
     console.error('[DoctorService] Update routine error:', error);
@@ -463,6 +482,14 @@ export const addMedication = async (patientId, medData) => {
       takenToday: false,
       createdAt: serverTimestamp()
     });
+
+    // Send notification to patient
+    await sendNotification(patientId, {
+      title: 'New Medication Added',
+      message: `Your doctor has added ${medData.name} to your daily protocol.`,
+      type: 'info'
+    });
+
     return { id: docRef.id, success: true };
   } catch (error) {
     console.error('[DoctorService] Add medication error:', error);

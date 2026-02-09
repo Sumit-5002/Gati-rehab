@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Activity, LayoutDashboard, LogOut, User, Settings, Zap, Compass, Sparkles, UserCircle, MessageSquare, FileText } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettingsClick = null, theme = 'light' }) => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
   const profile = userData || doctorProfile;
 
   return (
-    <header className={`${isDark ? 'bg-[#0F172A]/80 border-white/5' : 'bg-white/70 border-slate-100/50'} backdrop-blur-2xl sticky top-0 z-[100] border-b`}>
+    <header className={`${isDark ? 'bg-[#0F172A]/80 border-white/5' : 'bg-white/70 border-slate-100/50'} backdrop-blur-xl sticky top-0 z-[100] border-b`}>
       <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-2 sm:py-4">
         <div className="flex items-center justify-between">
           {/* Logo/Brand */}
@@ -88,6 +89,15 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
                     label="Reports"
                   />
                 </>
+              ) : userType === 'admin' ? (
+                <>
+                  <NavButton
+                    active={isActive('/admin-dashboard')}
+                    onClick={() => navigate('/admin-dashboard')}
+                    icon={<LayoutDashboard className="w-4 h-4" />}
+                    label="System Panel"
+                  />
+                </>
               ) : (
                 <>
                   <NavButton
@@ -138,6 +148,8 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
                   <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               )}
+
+              <NotificationBell />
 
               <button
                 onClick={handleLogout}

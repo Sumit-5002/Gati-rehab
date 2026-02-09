@@ -15,6 +15,7 @@ const AddPatientModal = ({ isOpen, onClose, doctorId }) => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [isExistingUser, setIsExistingUser] = useState(false);
 
     // Accessibility: Handle Escape key
     useEscapeKey(onClose, isOpen);
@@ -34,13 +35,17 @@ const AddPatientModal = ({ isOpen, onClose, doctorId }) => {
 
         setLoading(true);
         try {
-            await addPatientToDoctor(doctorId, formData);
+            const result = await addPatientToDoctor(doctorId, formData);
+            // result = { id, success, isNewUser }
+            setIsExistingUser(!result.isNewUser);
+
             setSuccess(true);
             setTimeout(() => {
                 setSuccess(false);
+                setIsExistingUser(false);
                 onClose();
                 setFormData({ name: '', email: '', condition: '', phoneNumber: '', notes: '' });
-            }, 2000);
+            }, 3000);
         } catch (err) {
             setError(err.message || 'Failed to add patient. Please try again.');
         } finally {
@@ -61,7 +66,7 @@ const AddPatientModal = ({ isOpen, onClose, doctorId }) => {
             {/* Modal */}
             <div className="relative bg-white rounded-[3rem] shadow-3xl w-full max-w-xl overflow-hidden transform transition-all animate-in fade-in zoom-in duration-300">
                 <div className="p-8 md:p-12">
-                    <div className="flex items-center justify-between mb-10">
+                    <div className="flex items-center justify-between mb-2">
                         <div>
                             <h2 className="text-3xl font-black text-slate-900 leading-none mb-2">Add New <span className="text-blue-600">Patient</span></h2>
                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Clinical Onboarding</p>
@@ -80,8 +85,21 @@ const AddPatientModal = ({ isOpen, onClose, doctorId }) => {
                             <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-100">
                                 <CheckCircle2 className="w-12 h-12" />
                             </div>
-                            <h3 className="text-2xl font-black text-slate-900 mb-2">Onboarding Successful!</h3>
-                            <p className="text-slate-500 font-bold">The patient profile has been created and linked to your clinic.</p>
+                            {isExistingUser ? (
+                                <>
+                                    <h3 className="text-2xl font-black text-slate-900 mb-2">Patient Found & Linked!</h3>
+                                    <p className="text-slate-500 font-bold max-w-xs mx-auto">
+                                        This user already has a Gati account. They have been successfully linked to your clinic and will see you in their dashboard.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="text-2xl font-black text-slate-900 mb-2">Invite Sent!</h3>
+                                    <p className="text-slate-500 font-bold max-w-xs mx-auto">
+                                        The patient has been linked. They must <span className="text-blue-600">Sign Up</span> using {formData.email} to access their dashboard.
+                                    </p>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-6">

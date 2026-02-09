@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, User, Plus, Filter, Check, Trash2 } from 'lucide-react';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase/config';
+import { sendNotification } from '../../../../shared/services/notificationService';
 
 const SchedulerModal = ({ isOpen, onClose, doctorId, patients, onJoinCall }) => {
     const [appointments, setAppointments] = useState([]);
@@ -53,6 +54,14 @@ const SchedulerModal = ({ isOpen, onClose, doctorId, patients, onJoinCall }) => 
                 status: 'scheduled',
                 createdAt: serverTimestamp()
             });
+
+            // Send notification to patient
+            await sendNotification(newAppt.patientId, {
+                title: 'New Session Scheduled',
+                message: `Dr. Gati has scheduled a new ${newAppt.type} session for you on ${new Date(newAppt.date).toLocaleDateString()} at ${newAppt.time}.`,
+                type: 'info'
+            });
+
             setIsAdding(false);
             setNewAppt({ patientId: '', date: '', time: '', type: 'Consultation', meetingLink: 'https://meet.google.com/ayd-uthv-yvd' });
             fetchAppointments();
@@ -129,15 +138,14 @@ const SchedulerModal = ({ isOpen, onClose, doctorId, patients, onJoinCall }) => 
                                                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {appt.time}</span>
                                                     <span className="px-2 py-0.5 bg-slate-100 rounded-full text-slate-600">{appt.type}</span>
                                                     {appt.status === 'scheduled' && (
-                                                        <button
-                                                            onClick={() => {
-                                                                onJoinCall?.(`Gati_Session_${appt.id}`);
-                                                                onClose();
-                                                            }}
-                                                            className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full flex items-center gap-1 hover:bg-blue-200 transition-colors"
+                                                        <a
+                                                            href={appt.meetingLink}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full flex items-center gap-1 hover:bg-blue-200 transition-colors no-underline"
                                                         >
                                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> Join Call
-                                                        </button>
+                                                        </a>
                                                     )}
                                                 </div>
                                             </div>
@@ -192,12 +200,13 @@ const SchedulerModal = ({ isOpen, onClose, doctorId, patients, onJoinCall }) => 
                                 </div>
 
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block ml-1">Video Link (Auto-Generated)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block ml-1">Video Link (Default)</label>
                                     <input
                                         type="url"
-                                        value={newAppt.meetingLink}
                                         readOnly
-                                        className="w-full p-4 bg-slate-100 border-2 border-slate-100 rounded-2xl font-black text-slate-500 text-xs outline-none cursor-not-allowed"
+                                        disabled
+                                        value={newAppt.meetingLink}
+                                        className="w-full p-4 bg-slate-100 border-none rounded-2xl font-black text-slate-400 text-xs cursor-not-allowed"
                                     />
                                 </div>
 

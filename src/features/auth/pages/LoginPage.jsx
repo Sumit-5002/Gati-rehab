@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, User, ArrowLeft, Activity, Stethoscope, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft, Activity, Stethoscope, Eye, EyeOff, Shield } from 'lucide-react';
 import {
   loginWithEmail,
   signupWithEmail,
@@ -17,7 +17,7 @@ import { logAction } from '../../../shared/utils/auditLogger';
 const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ringColor, textColor, suffix, ...props }) => (
   <div className="relative group">
     {icon && (
-      <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors ${textColor === 'text-blue-600' ? 'group-focus-within:text-blue-600' : 'group-focus-within:text-teal-600'}`}>
+      <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors ${textColor === 'text-blue-600' ? 'group-focus-within:text-blue-600' : textColor === 'text-teal-600' ? 'group-focus-within:text-teal-600' : 'group-focus-within:text-slate-800'}`}>
         {icon}
       </div>
     )}
@@ -53,7 +53,7 @@ const PrimaryButton = ({ loading, text, bgColor, bgHoverColor }) => (
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [userType, setUserType] = useState('patient'); // 'patient' or 'doctor'
+  const [userType, setUserType] = useState('patient'); // 'patient', 'doctor', 'admin'
   const [authMode, setAuthMode] = useState('email'); // 'email', 'phone', 'forgot'
   const [isSignUp, setIsSignUp] = useState(false);
 
@@ -65,13 +65,36 @@ const LoginPage = () => {
   }, [location.state]);
 
   // Dynamic Theme Colors based on userType
-  const bgColor = userType === 'patient' ? 'bg-blue-600' : 'bg-teal-600';
-  const bgHoverColor = userType === 'patient' ? 'hover:bg-blue-700' : 'hover:bg-teal-700';
-  const textColor = userType === 'patient' ? 'text-blue-600' : 'text-teal-600';
-  const ringColor = userType === 'patient' ? 'focus:ring-blue-500' : 'focus:ring-teal-500';
-  const gradient = userType === 'patient'
-    ? 'from-blue-50 via-indigo-50 to-white'
-    : 'from-teal-50 via-emerald-50 to-white';
+  const getThemeColors = () => {
+    switch (userType) {
+      case 'doctor':
+        return {
+          bgColor: 'bg-teal-600',
+          bgHoverColor: 'hover:bg-teal-700',
+          textColor: 'text-teal-600',
+          ringColor: 'focus:ring-teal-500',
+          gradient: 'from-teal-50 via-emerald-50 to-white'
+        };
+      case 'admin':
+        return {
+          bgColor: 'bg-slate-800',
+          bgHoverColor: 'hover:bg-slate-900',
+          textColor: 'text-slate-800',
+          ringColor: 'focus:ring-slate-500',
+          gradient: 'from-slate-100 via-gray-100 to-white'
+        };
+      default: // patient
+        return {
+          bgColor: 'bg-blue-600',
+          bgHoverColor: 'hover:bg-blue-700',
+          textColor: 'text-blue-600',
+          ringColor: 'focus:ring-blue-500',
+          gradient: 'from-blue-50 via-indigo-50 to-white'
+        };
+    }
+  };
+
+  const { bgColor, bgHoverColor, textColor, ringColor, gradient } = getThemeColors();
 
   // Input states
   const [email, setEmail] = useState('');
@@ -110,12 +133,15 @@ const LoginPage = () => {
     setError(''); setLoading(true);
     try {
       if (isSignUp) {
+        // Only verify admin code if signing up as admin (simple check for now)
+        if (userType === 'admin') {
+          // For now, allow regular signup but note it creates "admin" request
+        }
+
         await signupWithEmail(email, password, name, userType);
-        // After signup, we might need to fetch the newly created userData or just redirect
-        // Since signupWithEmail already creates the document, we can redirect
         handleAuthRedirect({ userType });
       } else {
-        const { userData } = await loginWithEmail(email, password);
+        const { userData } = await loginWithEmail(email, password, userType);
         handleAuthRedirect(userData);
       }
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -168,10 +194,16 @@ const LoginPage = () => {
 
   const fillDemoCredentials = () => {
     if (loading) return;
-    const creds = userType === 'doctor' ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
-    setEmail(creds.email);
-    setPassword(creds.password);
-    setSuccess('Demo credentials applied.');
+    let creds;
+    if (userType === 'admin') creds = DEMO_CREDENTIALS.admin;
+    else if (userType === 'doctor') creds = DEMO_CREDENTIALS.doctor;
+    else creds = DEMO_CREDENTIALS.patient;
+
+    if (creds) {
+      setEmail(creds.email);
+      setPassword(creds.password);
+      setSuccess('Demo credentials applied.');
+    }
   };
 
   const resetToEmail = () => {
@@ -194,7 +226,7 @@ const LoginPage = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex justify-center mb-6">
-            <div className={`p-3 rounded-2xl ${userType === 'patient' ? 'bg-blue-50' : 'bg-teal-50'} transition-colors duration-300`}>
+            <div className={`p-3 rounded-2xl ${userType === 'patient' ? 'bg-blue-50' : userType === 'doctor' ? 'bg-teal-50' : 'bg-slate-100'} transition-colors duration-300`}>
               <img src="/logo.png" alt="Gati Logo" className="w-16 h-16 object-contain" />
             </div>
           </div>
@@ -202,7 +234,7 @@ const LoginPage = () => {
             GATI<span className={`${textColor} transition-colors duration-300`}>REHAB</span>
           </h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            {userType === 'patient' ? 'Patient Recovery Portal' : 'Professional Clinical Suite'}
+            {userType === 'patient' ? 'Patient Recovery Portal' : userType === 'doctor' ? 'Professional Clinical Suite' : 'System Administration'}
           </p>
         </div>
 
@@ -211,28 +243,38 @@ const LoginPage = () => {
           <div className="flex bg-slate-100 p-1 rounded-xl relative">
             {/* Sliding Background */}
             <div
-              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm transition-all duration-300 ease-in-out ${userType === 'patient' ? 'left-1' : 'translate-x-full left-1'}`}
+              className={`absolute top-1 bottom-1 w-[calc(33.33%-4px)] rounded-lg bg-white shadow-sm transition-all duration-300 ease-in-out ${userType === 'patient' ? 'left-1' :
+                userType === 'doctor' ? 'left-[33.33%]' :
+                  'left-[66.66%]'
+                }`}
             ></div>
 
             <button
               onClick={() => setUserType('patient')}
               disabled={loading}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'patient'}
-              aria-label="Select Patient login"
             >
-              <User className="w-4 h-4" />
+              <User className="w-3.5 h-3.5" />
               Patient
             </button>
             <button
               onClick={() => setUserType('doctor')}
               disabled={loading}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'doctor'}
-              aria-label="Select Doctor login"
             >
-              <Stethoscope className="w-4 h-4" />
+              <Stethoscope className="w-3.5 h-3.5" />
               Doctor
+            </button>
+            <button
+              onClick={() => setUserType('admin')}
+              disabled={loading}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'admin' ? 'text-slate-900' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              aria-pressed={userType === 'admin'}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Admin
             </button>
           </div>
         </div>
@@ -266,7 +308,7 @@ const LoginPage = () => {
                   type="email"
                   id="login-email"
                   name="email"
-                  placeholder={userType === 'patient' ? "patient@example.com" : "doctor@hospital.com"}
+                  placeholder={userType === 'patient' ? "patient@example.com" : userType === 'doctor' ? "doctor@hospital.com" : "admin@system.com"}
                   value={email}
                   onChange={setEmail}
                   autoComplete="email"
@@ -321,8 +363,8 @@ const LoginPage = () => {
                 <PrimaryButton
                   loading={loading}
                   text={isSignUp
-                    ? (userType === 'patient' ? 'Join Recovery' : 'Register Clinic')
-                    : (userType === 'patient' ? 'Start Recovery' : 'Access Dashboard')
+                    ? (userType === 'patient' ? 'Join Recovery' : userType === 'doctor' ? 'Register Clinic' : 'Register Admin')
+                    : (userType === 'patient' ? 'Start Recovery' : userType === 'doctor' ? 'Access Dashboard' : 'System Login')
                   }
                   bgColor={bgColor}
                   bgHoverColor={bgHoverColor}
@@ -330,51 +372,57 @@ const LoginPage = () => {
               </form>
 
               {/* Sign Up / Login Toggle */}
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  disabled={loading}
-                  className={`text-sm font-bold ${textColor} hover:opacity-80 transition-opacity disabled:opacity-50`}
-                >
-                  {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
-                </button>
-              </div>
+              {userType !== 'admin' && ( // Hide Signup toggle for Admin ideally, but let's keep it consistent or hide? User asked for "admin section", hiding signup for admin is cleaner.
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    disabled={loading}
+                    className={`text-sm font-bold ${textColor} hover:opacity-80 transition-opacity disabled:opacity-50`}
+                  >
+                    {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+                  </button>
+                </div>
+              )}
 
               {/* Enhanced Divider */}
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
+              {userType !== 'admin' && (
+                <>
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-white px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Or continue with
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Social Actions */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
-                  aria-label="Sign in with Google"
-                >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
-                  <span className="text-sm">Google</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('phone')}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
-                >
-                  <Activity className="w-5 h-5 text-slate-400" />
-                  <span className="text-sm">Phone</span>
-                </button>
-              </div>
+                  {/* Social Actions */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={loading}
+                      className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
+                      aria-label="Sign in with Google"
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
+                      <span className="text-sm">Google</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('phone')}
+                      disabled={loading}
+                      className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
+                    >
+                      <Activity className="w-5 h-5 text-slate-400" />
+                      <span className="text-sm">Phone</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

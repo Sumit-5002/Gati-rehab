@@ -12,9 +12,12 @@ import {
   getDocs,
   onSnapshot,
   addDoc,
+  setDoc,
+  updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
+import { sendNotification } from '../../../shared/services/notificationService';
 
 /**
  * Get patient profile data
@@ -99,7 +102,6 @@ export const getRecentSessions = async (patientId, limitCount = 10) => {
     const q = query(
       sessionsRef,
       where('patientId', '==', patientId),
-      orderBy('date', 'desc'),
       limit(limitCount)
     );
 
@@ -110,13 +112,16 @@ export const getRecentSessions = async (patientId, limitCount = 10) => {
       const data = doc.data();
       sessions.push({
         id: doc.id,
-        exerciseName: data.exerciseName,
+        ...data,
         date: formatDate(data.date),
-        reps: data.reps,
-        quality: data.quality,
-        rangeOfMotion: data.rangeOfMotion,
-        duration: data.duration,
       });
+    });
+
+    // Client-side sort: most recent first
+    sessions.sort((a, b) => {
+      const tA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const tB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return tB - tA;
     });
 
     return sessions;
@@ -170,7 +175,6 @@ export const subscribeToRecentSessions = (patientId, callback, limitCount = 10) 
   const q = query(
     sessionsRef,
     where('patientId', '==', patientId),
-    orderBy('date', 'desc'),
     limit(limitCount)
   );
 
@@ -180,14 +184,18 @@ export const subscribeToRecentSessions = (patientId, callback, limitCount = 10) 
       const data = doc.data();
       sessions.push({
         id: doc.id,
-        exerciseName: data.exerciseName,
+        ...data,
         date: formatDate(data.date),
-        reps: data.reps,
-        quality: data.quality,
-        rangeOfMotion: data.rangeOfMotion,
-        duration: data.duration,
       });
     });
+
+    // Client-side sort
+    sessions.sort((a, b) => {
+      const tA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const tB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return tB - tA;
+    });
+
     callback(sessions);
   }, (error) => {
     console.error('[PatientService] Subscribe sessions error:', error);
@@ -196,21 +204,56 @@ export const subscribeToRecentSessions = (patientId, callback, limitCount = 10) 
 
 /**
  * Get trend data for charts
+ * Aggregates data from recent sessions if pre-computed trends don't exist
  */
 export const getTrendData = async (patientId) => {
   try {
-    // Get ROM trend data
+    // 1. Try to get pre-computed ROM trend data
     const romRef = doc(db, 'trends', patientId, 'weekly', 'rom');
     const romSnap = await getDoc(romRef);
 
-    // Get quality trend data
+    // 2. Try to get pre-computed quality trend data
     const qualityRef = doc(db, 'trends', patientId, 'daily', 'quality');
     const qualitySnap = await getDoc(qualityRef);
 
-    return {
+    const result = {
       romData: romSnap.exists() ? romSnap.data().data : [],
       qualityData: qualitySnap.exists() ? qualitySnap.data().data : [],
     };
+
+    // 3. Fallback: If no trend data exists, compute from last 7 sessions
+    if (result.romData.length === 0 || result.qualityData.length === 0) {
+      const sessionsRef = collection(db, 'sessions');
+      const q = query(
+        sessionsRef,
+        where('patientId', '==', patientId),
+        orderBy('date', 'asc'),
+        limit(7)
+      );
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        const sessionMeds = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const d = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+          return {
+            day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+            rom: data.rangeOfMotion || 0,
+            quality: data.quality || 0,
+            timestamp: d.getTime()
+          };
+        });
+
+        if (result.romData.length === 0) {
+          result.romData = sessionMeds.map(s => ({ day: s.day, value: s.rom }));
+        }
+        if (result.qualityData.length === 0) {
+          result.qualityData = sessionMeds.map(s => ({ day: s.day, value: s.quality }));
+        }
+      }
+    }
+
+    return result;
   } catch (error) {
     console.error('[PatientService] Get trend data error:', error);
     return {
@@ -269,22 +312,81 @@ export const logPainLevel = async (patientId, painData) => {
 };
 
 /**
- * Get pain history
+ * Connect patient to a doctor by doctor's email
  */
+/**
+ * Connect patient to a doctor by doctor's email
+ */
+export const connectWithDoctor = async (patientId, doctorEmail) => {
+  try {
+    if (!doctorEmail) throw new Error('Doctor email is required');
+
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', doctorEmail), where('userType', '==', 'doctor'));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      throw new Error('No doctor found with this email.');
+    }
+
+    const doctorDoc = snapshot.docs[0];
+    const doctorId = doctorDoc.id;
+    const doctorData = doctorDoc.data();
+
+    // Update patient profile
+    await updateDoc(doc(db, 'users', patientId), {
+      doctorId: doctorId,
+      doctorName: doctorData.name || 'Your Doctor'
+    });
+
+    // Add to doctor_patients (for legacy compatibility)
+    // We fetch patient data first to ensure we have name/email
+    const patientSnap = await getDoc(doc(db, 'users', patientId));
+    const patientData = patientSnap.exists() ? patientSnap.data() : { name: 'Patient', email: '' };
+
+    await setDoc(doc(db, 'doctor_patients', doctorId, 'patients', patientId), {
+      assignedAt: serverTimestamp(),
+      active: true,
+      patientEmail: patientData.email,
+      patientName: patientData.name
+    }, { merge: true });
+
+    // Notify doctor
+    await sendNotification(doctorId, {
+      title: 'New Patient Connected',
+      message: `${patientData.name || 'A patient'} has linked their recovery dashboard to you.`,
+      type: 'success',
+      patientId: patientId
+    });
+
+    return { success: true, doctorName: doctorData.name };
+  } catch (error) {
+    console.error('[PatientService] Connect doctor error:', error);
+    throw error;
+  }
+};
 export const getPainHistory = async (patientId, limitCount = 7) => {
   try {
     const painLogsRef = collection(db, 'pain_logs');
     const q = query(
       painLogsRef,
       where('patientId', '==', patientId),
-      orderBy('timestamp', 'desc'),
       limit(limitCount)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    const logs = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+
+    // Client-side sort: most recent first
+    logs.sort((a, b) => {
+      const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
+      const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
+      return tB - tA;
+    });
+
+    return logs;
   } catch (error) {
     console.error('[PatientService] Get pain history error:', error);
     throw error;
