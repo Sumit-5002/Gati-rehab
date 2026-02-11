@@ -181,14 +181,14 @@ const LandingPage = () => {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => { window.location.href = 'https://drive.google.com/file/d/1LY1GB5bhbkSJJmyyQ7wMInTpYldUeTS-/view?usp=drivesdk'; }}
                 className={`group px-8 py-4 font-bold rounded-xl text-lg border-2 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center gap-2 ${darkMode
                   ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700'
                   : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-300 shadow-xl'
                   }`}
               >
                 <PlayCircle className="w-5 h-5" />
-                Watch Demo
+                Watch Video
               </button>
             </div>
 
