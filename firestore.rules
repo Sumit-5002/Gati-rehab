@@ -49,11 +49,31 @@ service cloud.firestore {
       );
     }
     
+    function isBootstrapAdmin() {
+      return request.auth.uid == 'uK7m9926Oua8JQAt3IpiZ4AWDyM2';
+    }
+
     function isNotChangingType() {
-      return resource == null || (
-        request.resource.data.userType == resource.data.userType &&
-        (!('role' in resource.data) || request.resource.data.role == resource.data.role)
-      );
+      // Admins and Bootstrap UID can set any type/role
+      if (isAdmin() || isBootstrapAdmin()) {
+        return true;
+      }
+
+      // For new documents (creation)
+      if (resource == null) {
+        let targetType = request.resource.data.get('userType', 'patient');
+        let targetRole = request.resource.data.get('role', 'patient');
+        let isBecomingAdmin = targetType == 'admin' || targetRole == 'admin';
+        let isBecomingDoctor = targetType == 'doctor' || targetRole == 'doctor';
+
+        // Non-admins cannot create admin accounts
+        // Non-admins can only create doctor accounts for themselves (self-signup)
+        return !isBecomingAdmin && (!isBecomingDoctor || isOwner(userId));
+      }
+
+      // For existing documents (updates)
+      return request.resource.data.get('userType', 'patient') == resource.data.get('userType', 'patient') &&
+             request.resource.data.get('role', 'patient') == resource.data.get('role', 'patient');
     }
 
     // 1. Users collection 
@@ -63,11 +83,14 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isDoctor() || isAdmin() || isPatientOf(userId);
 
       // Allow create if owner (signup) or doctor/admin (adding patient)
-      allow create: if isOwner(userId) || isDoctor() || isAdmin();
+      // Must also validate that userType/role is not being escalated
+      allow create: if (isOwner(userId) || isDoctor() || isAdmin()) && isNotChangingType();
 
-      // Allow update if owner (but not changing type), doctor (if patient is unassigned or assigned to them), or admin
-      allow update: if (isOwner(userId) && isNotChangingType()) ||
-                     (isDoctor() && resource.data.userType == 'patient' && (resource.data.doctorId == request.auth.uid || resource.data.doctorId == null)) ||
+      // Allow update if owner, doctor (if patient is unassigned or assigned to them), or admin
+      // All non-admin updates must not change userType or role
+      allow update: if ((isOwner(userId)) ||
+                     (isDoctor() && resource.data.userType == 'patient' && (resource.data.doctorId == request.auth.uid || resource.data.doctorId == null))) &&
+                     isNotChangingType() ||
                      isAdmin();
 
       allow delete: if isAdmin();

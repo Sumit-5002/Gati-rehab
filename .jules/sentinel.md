@@ -12,3 +12,8 @@
 **Vulnerability:** Permissive update rules on the 'users' collection allowed users to change their own 'userType' or 'role'. Additionally, any authenticated user could create notifications for any other user.
 **Learning:** Checking for 'isOwner' is not enough for the 'users' collection; we must also ensure that sensitive identity fields are not modified during self-updates using 'request.resource.data.field == resource.data.field'.
 **Prevention:** Implement a 'isNotChangingType()' helper and apply it to 'users' updates. Restrict 'notifications' creation to valid doctor-patient-admin relationships.
+
+## 2026-05-20 - [Critical Privilege Escalation Gap in Firestore Rules]
+**Vulnerability:** Firestore rules lacked validation of 'userType' and 'role' fields during document creation, allowing any new user to sign up as an 'admin'. Additionally, doctors could escalate patient accounts to 'admin' status during updates because protection was only applied to owners.
+**Learning:** Checking 'isOwner' or 'isDoctorOf' is insufficient if sensitive identity fields are not explicitly protected during the 'create' phase or for all non-admin actors in 'update'.
+**Prevention:** Implement a robust validation helper (e.g., 'isNotChangingType') that handles both 'create' (by blocking 'admin' values for non-admins) and 'update' (by ensuring equality with existing values). Always include a bootstrap UID exception for initial system setup.
