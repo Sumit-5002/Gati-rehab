@@ -10,13 +10,9 @@ import {
   Plus,
   LayoutGrid,
   List,
-  Bell,
-  MoreVertical,
   Calendar,
-  MessageSquare,
   ChevronRight,
-  Target,
-  ArrowLeft, User, Mail, Phone, ClipboardList, X
+  Target
 } from 'lucide-react';
 import {
   collection,
@@ -28,6 +24,7 @@ import { db } from '../../../lib/firebase/config';
 import { lazy, Suspense } from 'react';
 import NavHeader from '../../../shared/components/NavHeader';
 import Footer from '../../../shared/components/Footer';
+import { useTheme } from '../../../contexts/ThemeContext';
 import PatientCard from '../components/PatientCard';
 const AdherenceTrendChart = lazy(() => import('../components/charts/AdherenceTrendChart'));
 const FormQualityChart = lazy(() => import('../components/charts/FormQualityChart'));
@@ -52,6 +49,7 @@ import { updateUserProfile } from '../../auth/services/authService';
 
 const DoctorDashboard = () => {
   const { userData, user } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   const handleSettingsSave = async (data) => {
     try {
@@ -88,6 +86,7 @@ const DoctorDashboard = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [reportsOpen, setReportsOpen] = useState(false);
   const [aiInsights, setAiInsights] = useState([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [timeframe, setTimeframe] = useState('weekly');
 
   const handleActionClick = (id) => {
@@ -113,7 +112,24 @@ const DoctorDashboard = () => {
     // 1. Listen for patient updates
     const unsubscribe = subscribeToDoctorPatients(user.uid, async (updatedPatients) => {
       setPatients(updatedPatients);
-      setAiInsights(generateDoctorInsights(updatedPatients));
+
+      // Generate AI insights asynchronously
+      setInsightsLoading(true);
+      try {
+        const insights = await generateDoctorInsights(updatedPatients);
+        setAiInsights(insights);
+      } catch (err) {
+        console.error('Error generating insights:', err);
+        setAiInsights([{
+          id: 'error',
+          type: 'info',
+          title: 'Analysis Pending',
+          message: 'Neural insights will appear once patient data is processed.',
+          color: 'blue'
+        }]);
+      } finally {
+        setInsightsLoading(false);
+      }
 
       // 2. Pass the fresh data to charts immediately (Fixes Point 2 & 3)
       // This prevents re-fetching the patients inside the chart functions
@@ -160,13 +176,32 @@ const DoctorDashboard = () => {
     };
   }, [user, userData]);
 
-  // Stats calculation
+  // Stats calculation with smart adherence fallback
   useEffect(() => {
     if (patients.length > 0) {
       const total = patients.length;
-      const avg = Math.round(patients.reduce((sum, p) => sum + (p.adherenceRate || 0), 0) / total);
-      const urgent = patients.filter((p) => (p.adherenceRate || 0) < 60).length;
+
+      // Calculate average adherence with fallback to completed/total ratio
+      const adherenceValues = patients.map(p => {
+        // Use adherenceRate if available, otherwise calculate from sessions
+        if (p.adherenceRate && p.adherenceRate > 0) {
+          return p.adherenceRate;
+        }
+        // Fallback: calculate from completed vs total sessions
+        const completed = p.completedSessions || 0;
+        const totalSessions = p.totalSessions || 5; // Default weekly goal
+        return Math.min(100, Math.round((completed / totalSessions) * 100));
+      });
+
+      const avg = Math.round(adherenceValues.reduce((sum, val) => sum + val, 0) / total) || 0;
+      const urgent = patients.filter((p) => {
+        const rate = p.adherenceRate || (p.completedSessions / (p.totalSessions || 5)) * 100;
+        return rate < 60;
+      }).length;
+
       setStats({ totalPatients: total, averageAdherence: avg, needsAttention: urgent });
+    } else {
+      setStats({ totalPatients: 0, averageAdherence: 0, needsAttention: 0 });
     }
   }, [patients]);
 
@@ -191,8 +226,13 @@ const DoctorDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9]">
-      <NavHeader userType="doctor" onSettingsClick={() => setSettingsOpen(true)} />
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-[#F1F5F9]'}`}>
+      <NavHeader
+        userType="doctor"
+        theme={isDarkMode ? 'dark' : 'light'}
+        onThemeToggle={toggleTheme}
+        onSettingsClick={() => setSettingsOpen(true)}
+      />
 
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10 safe-area-inset">
         {/* Modern Header Section */}
@@ -201,9 +241,6 @@ const DoctorDashboard = () => {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
               Clinic <span className="text-blue-600">Overview</span>
             </h1>
-            <p className="text-slate-500 font-bold text-sm sm:text-lg flex items-center gap-2">
-              <Users className="w-5 h-5" /> Monitoring {patients.length} active rehabilitation plans
-            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-white">
@@ -271,7 +308,6 @@ const DoctorDashboard = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div>
                   <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">Clinical Analytics</h3>
-                  <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Health & Recovery Trends</p>
                 </div>
                 <div className="flex p-1.5 bg-slate-100 rounded-2xl w-full sm:w-auto">
                   <button
@@ -311,7 +347,6 @@ const DoctorDashboard = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div>
                   <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">Patient Directory</h3>
-                  <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Active Monitoring</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
                   <select
@@ -368,24 +403,35 @@ const DoctorDashboard = () => {
                   </div>
                   <div>
                     <h4 className="text-lg font-black">Neural Insights</h4>
-                    <p className="text-blue-400 text-xs font-bold uppercase tracking-widest">Powered by Gati AI</p>
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {aiInsights.map((insight) => (
-                    <div key={insight.id} className="p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer group/item">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className={`text-[10px] ${insight.color === 'emerald' ? 'text-emerald-400' : insight.color === 'blue' ? 'text-blue-400' : 'text-indigo-400'} font-black uppercase tracking-widest`}>{insight.title}</p>
-                        <ChevronRight className="w-4 h-4 text-white/20 group-hover/item:translate-x-1 transition-transform" />
-                      </div>
-                      <p className="text-sm font-bold text-slate-200">{insight.message}</p>
+                  {insightsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-400"></div>
+                      <p className="text-slate-400 text-xs font-bold italic">Generating AI insights...</p>
                     </div>
-                  ))}
-                  {aiInsights.length === 0 && (
-                    <p className="text-slate-500 text-xs font-bold italic text-center py-4">Analyzing clinical data...</p>
+                  ) : (
+                    <>
+                      {aiInsights.map((insight) => (
+                        <div key={insight.id} className="p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer group/item">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className={`text-[10px] ${insight.color === 'emerald' ? 'text-emerald-400' : insight.color === 'blue' ? 'text-blue-400' : 'text-indigo-400'} font-black uppercase tracking-widest`}>{insight.title}</p>
+                            <ChevronRight className="w-4 h-4 text-white/20 group-hover/item:translate-x-1 transition-transform" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-200">{insight.message}</p>
+                        </div>
+                      ))}
+                      {aiInsights.length === 0 && !insightsLoading && (
+                        <p className="text-slate-500 text-xs font-bold italic text-center py-4">No insights available yet.</p>
+                      )}
+                    </>
                   )}
                 </div>
-                <button className="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black transition-all shadow-lg shadow-blue-600/20 transform active:scale-95">
+                <button
+                  onClick={() => setReportsOpen(true)}
+                  className="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black transition-all shadow-lg shadow-blue-600/20 transform active:scale-95"
+                >
                   View Full Analysis
                 </button>
               </div>
@@ -427,8 +473,10 @@ const DoctorDashboard = () => {
           </div>
         </div>
 
-        <Footer />
+
       </main>
+
+      <Footer />
 
       <SettingsModal
         isOpen={settingsOpen}

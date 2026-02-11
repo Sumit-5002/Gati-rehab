@@ -74,7 +74,7 @@ export const getPatientStats = async (patientId) => {
 };
 
 /**
- * Get patient's today routine
+ * Get patient's today routine with automatic daily reset
  */
 export const getTodayRoutine = async (patientId) => {
   try {
@@ -83,6 +83,29 @@ export const getTodayRoutine = async (patientId) => {
 
     if (routineSnap.exists()) {
       const data = routineSnap.data();
+      const lastUpdated = data.lastUpdated?.toDate ? data.lastUpdated.toDate() : new Date(data.lastUpdated || 0);
+      const today = new Date();
+
+      // Check if it's a new day (reset at midnight)
+      const isNewDay = !isSameDay(lastUpdated, today);
+
+      if (isNewDay) {
+        // Reset completion status for new day
+        const resetExercises = (data.exercises || []).map(ex => ({
+          ...ex,
+          completed: false
+        }));
+
+        // Update in Firestore
+        await updateDoc(routineRef, {
+          exercises: resetExercises,
+          lastUpdated: serverTimestamp()
+        });
+
+        console.log('[PatientService] Daily exercises reset for new day');
+        return resetExercises;
+      }
+
       return data.exercises || [];
     }
 
@@ -91,6 +114,66 @@ export const getTodayRoutine = async (patientId) => {
     console.error('[PatientService] Get routine error:', error);
     throw error;
   }
+};
+
+/**
+ * Save daily exercise plan (used by AI recommendations or doctor assignments)
+ */
+export const saveDailyPlan = async (patientId, exercises) => {
+  try {
+    const routineRef = doc(db, 'routines', patientId);
+    await setDoc(routineRef, {
+      exercises: exercises.map(ex => ({
+        ...ex,
+        completed: false
+      })),
+      lastUpdated: serverTimestamp(),
+      createdAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log('[PatientService] Daily plan saved successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[PatientService] Save daily plan error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark exercise as completed
+ */
+export const markExerciseCompleted = async (patientId, exerciseId) => {
+  try {
+    const routineRef = doc(db, 'routines', patientId);
+    const routineSnap = await getDoc(routineRef);
+
+    if (routineSnap.exists()) {
+      const data = routineSnap.data();
+      const updatedExercises = (data.exercises || []).map(ex =>
+        ex.id === exerciseId ? { ...ex, completed: true } : ex
+      );
+
+      await updateDoc(routineRef, {
+        exercises: updatedExercises
+      });
+
+      return { success: true };
+    }
+
+    return { success: false, error: 'Routine not found' };
+  } catch (error) {
+    console.error('[PatientService] Mark exercise completed error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper: Check if two dates are the same day
+ */
+const isSameDay = (date1, date2) => {
+  return date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate();
 };
 
 /**

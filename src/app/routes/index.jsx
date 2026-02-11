@@ -1,8 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../../shared/components/ProtectedRoute';
-import NavHeader from '../../shared/components/NavHeader';
-import Footer from '../../shared/components/Footer';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import Trends from '../../features/patient/pages/Trends';
 import PhysioLink from '../../features/patient/pages/PhysioLink';

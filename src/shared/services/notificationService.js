@@ -16,8 +16,6 @@ import { db } from '../../lib/firebase/config';
 
 /**
  * Send a notification to a user
- * @param {string} recipientId - UID of the recipient
- * @param {Object} data - Notification content { title, message, type, patientId?, actionUrl? }
  */
 export const sendNotification = async (recipientId, data) => {
     try {
@@ -27,15 +25,53 @@ export const sendNotification = async (recipientId, data) => {
             read: false,
             timestamp: serverTimestamp()
         });
+
+        // Also attempt a push notification if permissions are granted
+        if (Notification.permission === 'granted') {
+            showPushNotification(data.title || 'Gati Rehab', data.message);
+        }
     } catch (error) {
         console.error('[NotificationService] Send error:', error);
     }
 };
 
 /**
+ * Request permission for browser/native push notifications
+ */
+export const requestPushPermission = async () => {
+    if (!('Notification' in window)) {
+        console.log('This browser does not support notifications');
+        return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+};
+
+/**
+ * Show a browser level push notification
+ */
+export const showPushNotification = (title, body, icon = '/logo.png') => {
+    if (Notification.permission === 'granted') {
+        // Use Service Worker if available for better PWA support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: body,
+                    icon: icon,
+                    badge: icon,
+                    vibrate: [200, 100, 200],
+                    tag: 'gati-rehab-alert'
+                });
+            });
+        } else {
+            new Notification(title, { body, icon });
+        }
+    }
+};
+
+/**
  * Subscribe to notifications for a user
- * @param {string} recipientId - UID of the recipient
- * @param {function} callback - Callback with notifications list
  */
 export const subscribeToNotifications = (recipientId, callback) => {
     const notificationsRef = collection(db, 'notifications');
@@ -52,7 +88,6 @@ export const subscribeToNotifications = (recipientId, callback) => {
             time: formatTime(doc.data().timestamp)
         }));
 
-        // Client-side sort by timestamp desc
         notifications.sort((a, b) => {
             const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
             const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
@@ -65,9 +100,6 @@ export const subscribeToNotifications = (recipientId, callback) => {
     });
 };
 
-/**
- * Mark notification as read
- */
 export const markAsRead = async (notificationId) => {
     try {
         const notificationRef = doc(db, 'notifications', notificationId);
@@ -77,9 +109,6 @@ export const markAsRead = async (notificationId) => {
     }
 };
 
-/**
- * Mark all notifications as read
- */
 export const markAllAsRead = async (recipientId) => {
     try {
         const notificationsRef = collection(db, 'notifications');

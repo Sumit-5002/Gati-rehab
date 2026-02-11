@@ -138,9 +138,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
           const angles = calculateAngles(keypoints);
 
           if (angles) {
-            const feedback = generateRealTimeFeedback(angles, exerciseType, {
-              previousAngles: previousAnglesRef.current,
-            });
+            const feedback = generateRealTimeFeedback(angles, exerciseType, keypoints);
 
             // Handle Voice and Audio Feedback
             const now = Date.now();
@@ -149,7 +147,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
               if (now - lastOptimalTimeRef.current > 4000) {
                 if (!watchdogTriggeredRef.current || now - lastFeedbackTimeRef.current > 6000) {
                   if (settings.audioCues !== false) {
-                    speakFeedback(`Correction needed: ${feedback.message}`);
+                    speakFeedback(feedback.message); // Say exactly what's wrong (visibility or form)
                     playAudioCue('error');
                   }
                   lastFeedbackTimeRef.current = now;
@@ -157,7 +155,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
                 }
               } else {
                 // Regular feedback beeps/speech (throttled)
-                if (now - lastFeedbackTimeRef.current > 3000 && feedback.message !== lastFeedbackMessageRef.current) {
+                if (now - lastFeedbackTimeRef.current > 3500 && feedback.message !== lastFeedbackMessageRef.current) {
                   if (feedback.severity === 'error') {
                     if (settings.audioCues !== false) {
                       speakFeedback(feedback.message);
@@ -294,24 +292,21 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <Camera className="w-5 h-5 text-blue-400" />
-            <span className="text-sm font-medium text-slate-200 truncate">
-            {isModelLoaded ? 'AI Model Ready' : 'Loading AI Model...'}
-          </span>
           </div>
           {isCameraActive && (
             <FPSDisplay fps={fps} />
           )}
           {Number.isFinite(repCount) && (
-            <span className="text-xs font-bold text-blue-200 bg-blue-500/20 border border-blue-500/30 px-2.5 py-1 rounded-full">
-              Reps: {repCount}
+            <span className="text-xs font-black text-white bg-blue-600 px-3 py-1 rounded-lg shadow-lg shadow-blue-900/40">
+              REPS: {repCount}
             </span>
           )}
         </div>
         <button
           onClick={toggleCamera}
           className={`w-full sm:w-auto px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base ${isCameraActive
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
+            ? 'bg-red-500 hover:bg-red-600 text-white'
+            : 'bg-blue-500 hover:bg-blue-600 text-white'
             }`}
           disabled={!isModelLoaded}
         >

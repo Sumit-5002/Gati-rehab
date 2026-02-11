@@ -7,32 +7,103 @@
  * Format: { min: number, max: number, optimal: number }
  */
 export const IDEAL_ANGLES = {
-  'knee-bends': {
-    knee: { min: 70, max: 120, optimal: 90 },
-    hip: { min: 160, max: 180, optimal: 170 },
-    ankle: { min: 80, max: 100, optimal: 90 },
-  },
-  'leg-raises': {
-    hip: { min: 60, max: 120, optimal: 90 },
-    knee: { min: 160, max: 180, optimal: 170 },
-    ankle: { min: 80, max: 100, optimal: 90 },
-  },
-  'hip-flexion': {
-    hip: { min: 60, max: 120, optimal: 90 },
-    knee: { min: 160, max: 180, optimal: 170 },
-  },
-  'shoulder-raises': {
-    shoulder: { min: 60, max: 180, optimal: 120 },
-    elbow: { min: 160, max: 180, optimal: 170 },
-  },
-  'elbow-flexion': {
-    elbow: { min: 30, max: 150, optimal: 90 },
-    shoulder: { min: 160, max: 180, optimal: 170 },
-  },
   'standing-march': {
     hip: { min: 60, max: 120, optimal: 90 },
     knee: { min: 80, max: 120, optimal: 100 },
   },
+  'lateral-leg-raises': {
+    hip: { min: 20, max: 60, optimal: 45 },
+    shoulder: { min: 160, max: 180, optimal: 170 },
+  },
+  'arm-circles': {
+    shoulder: { min: 45, max: 175, optimal: 110 },
+    elbow: { min: 150, max: 180, optimal: 170 },
+  },
+  'knee-bends': {
+    knee: { min: 90, max: 170, optimal: 135 },
+    hip: { min: 140, max: 180, optimal: 160 },
+  },
+  'leg-raises': {
+    hip: { min: 120, max: 175, optimal: 145 },
+    knee: { min: 160, max: 180, optimal: 175 },
+  },
+  'hip-flexion': {
+    hip: { min: 80, max: 160, optimal: 110 },
+    knee: { min: 140, max: 180, optimal: 170 },
+  },
+  'shoulder-raises': {
+    shoulder: { min: 10, max: 100, optimal: 90 },
+    elbow: { min: 150, max: 180, optimal: 170 },
+  },
+  'elbow-flexion': {
+    elbow: { min: 30, max: 150, optimal: 45 },
+    shoulder: { min: 0, max: 20, optimal: 5 },
+  },
+  'squats': {
+    knee: { min: 80, max: 130, optimal: 100 },
+    hip: { min: 80, max: 140, optimal: 110 },
+    shoulder: { min: 140, max: 180, optimal: 170 },
+  },
+  'calf-raises': {
+    ankle: { min: 90, max: 165, optimal: 110 },
+    knee: { min: 160, max: 180, optimal: 170 },
+  },
+};
+
+/**
+ * Exercise to Joint Mapping for Visibility Checks
+ */
+export const EXERCISE_VISIBILITY_REQUIREMENTS = {
+  'knee-bends': ['LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE', 'LEFT_ANKLE', 'RIGHT_ANKLE'],
+  'leg-raises': ['LEFT_SHOULDER', 'RIGHT_SHOULDER', 'LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE'],
+  'hip-flexion': ['LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE'],
+  'shoulder-raises': ['LEFT_SHOULDER', 'RIGHT_SHOULDER', 'LEFT_ELBOW', 'RIGHT_ELBOW'],
+  'elbow-flexion': ['LEFT_SHOULDER', 'RIGHT_SHOULDER', 'LEFT_ELBOW', 'RIGHT_ELBOW', 'LEFT_WRIST', 'RIGHT_WRIST'],
+  'standing-march': ['LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE', 'LEFT_ANKLE', 'RIGHT_ANKLE'],
+  'squats': ['LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE', 'LEFT_ANKLE', 'RIGHT_ANKLE', 'LEFT_SHOULDER', 'RIGHT_SHOULDER'],
+  'lateral-leg-raises': ['LEFT_HIP', 'RIGHT_HIP', 'LEFT_KNEE', 'RIGHT_KNEE', 'LEFT_ANKLE', 'RIGHT_ANKLE'],
+  'arm-circles': ['LEFT_SHOULDER', 'RIGHT_SHOULDER', 'LEFT_ELBOW', 'RIGHT_ELBOW'],
+  'calf-raises': ['LEFT_KNEE', 'RIGHT_KNEE', 'LEFT_ANKLE', 'RIGHT_ANKLE'],
+};
+
+/**
+ * Check if required joints are visible in frame
+ * @param {Array} keypoints - MediaPipe keypoints
+ * @param {string} exerciseType - Current exercise
+ * @returns {Object|null} - Null if all good, otherwise error object
+ */
+export const checkPoseVisibility = (keypoints, exerciseType) => {
+  if (!keypoints || keypoints.length < 33) return { message: 'Camera Initializing...', severity: 'warning' };
+
+  const requirements = EXERCISE_VISIBILITY_REQUIREMENTS[exerciseType] || [];
+  const missingJoints = [];
+
+  // Define mapping for easier reading
+  const indexMap = {
+    LEFT_SHOULDER: 11, RIGHT_SHOULDER: 12,
+    LEFT_ELBOW: 13, RIGHT_ELBOW: 14,
+    LEFT_WRIST: 15, RIGHT_WRIST: 16,
+    LEFT_HIP: 23, RIGHT_HIP: 24,
+    LEFT_KNEE: 25, RIGHT_KNEE: 26,
+    LEFT_ANKLE: 27, RIGHT_ANKLE: 28
+  };
+
+  requirements.forEach(joint => {
+    const idx = indexMap[joint];
+    if (keypoints[idx] && keypoints[idx].visibility < 0.6) {
+      missingJoints.push(joint.toLowerCase().replace('_', ' '));
+    }
+  });
+
+  if (missingJoints.length > 3) {
+    return { message: 'Full body not visible! Step back.', severity: 'error' };
+  }
+
+  if (missingJoints.length > 0) {
+    return { message: `Move so your ${missingJoints[0]} is visible`, severity: 'error' };
+  }
+
+  return null;
 };
 
 /**
@@ -46,23 +117,48 @@ const FEEDBACK_MESSAGES = {
   positioningError: 'Adjust your position',
   speedTooFast: 'Slow down your movement',
   speedTooSlow: 'Move a bit faster',
-  goodForm: 'Excellent form!',
-  keepSteady: 'Keep your movement steady',
+  goodForm: 'Perfect form! Keep it up.',
+  keepSteady: 'Stay steady and controlled',
+  visibilityError: 'I can\'t see you clearly! Please adjust.',
+  encouragement: ['Great depth!', 'Perfect rhythm!', 'Keep going!', 'You\'re doing amazing!', 'Excellent control!'],
+};
+
+/**
+ * Get a random encouragement phrase
+ */
+const getEncouragement = () => {
+  const phrases = FEEDBACK_MESSAGES.encouragement;
+  return phrases[Math.floor(Math.random() * phrases.length)];
 };
 
 /**
  * Calculate real-time feedback based on current vs ideal angles
  * @param {Object} currentAngles - Current angles from pose detection
  * @param {string} exerciseType - Type of exercise
+ * @param {Array} keypoints - Raw pose keypoints for visibility check
  * @returns {Object} - Feedback object with visual and audio cues
  */
 export const generateRealTimeFeedback = (
   currentAngles,
-  exerciseType
+  exerciseType,
+  keypoints = null
 ) => {
+  // 1. Mandatory Visibility Check First
+  if (keypoints) {
+    const visibilityError = checkPoseVisibility(keypoints, exerciseType);
+    if (visibilityError) {
+      return {
+        ...visibilityError,
+        audioCue: 'warning',
+        visualCue: 'red',
+        corrections: []
+      };
+    }
+  }
+
   if (!currentAngles || !IDEAL_ANGLES[exerciseType]) {
     return {
-      message: 'Position yourself clearly in frame',
+      message: 'Show your body to begin!',
       severity: 'warning',
       audioCue: null,
       visualCue: null,
@@ -115,7 +211,8 @@ export const generateRealTimeFeedback = (
 
   // Determine overall feedback
   if (corrections.length === 0) {
-    message = FEEDBACK_MESSAGES.goodForm;
+    // 1 in 5 chance of extra encouragement
+    message = Math.random() > 0.8 ? getEncouragement() : FEEDBACK_MESSAGES.goodForm;
     severity = 'success';
     audioCue = 'success';
     visualCue = 'green';
@@ -124,7 +221,9 @@ export const generateRealTimeFeedback = (
     audioCue = severity === 'error' ? 'warning' : 'info';
     visualCue = severity === 'error' ? 'red' : 'yellow';
   } else {
-    message = `Multiple corrections needed: ${corrections.slice(0, 2).join(', ')}`;
+    // Be more specific about multiple issues
+    const primary = corrections[0];
+    message = `${primary} (and ${corrections.length - 1} more)`;
     audioCue = 'warning';
     visualCue = 'red';
     severity = 'error';
@@ -149,12 +248,12 @@ export const generateRealTimeFeedback = (
  */
 const analyzeJointAngle = (currentAngle, range, joint) => {
   const { min, max, optimal } = range;
-  const tolerance = 10; // ±10 degrees tolerance
+  const tolerance = 10;
+  const jointLabel = joint.charAt(0).toUpperCase() + joint.slice(1);
 
-  // Check if angle is within acceptable range
   if (currentAngle < min - tolerance) {
     return {
-      correction: `${joint}: Extend more (${currentAngle}° → ${optimal}°)`,
+      correction: `${jointLabel}: Try to straighten up more`,
       severity: 'error',
       direction: 'extend',
     };
@@ -162,7 +261,7 @@ const analyzeJointAngle = (currentAngle, range, joint) => {
 
   if (currentAngle > max + tolerance) {
     return {
-      correction: `${joint}: Flex more (${currentAngle}° → ${optimal}°)`,
+      correction: `${jointLabel}: Bend a bit further`,
       severity: 'error',
       direction: 'flex',
     };
@@ -170,14 +269,14 @@ const analyzeJointAngle = (currentAngle, range, joint) => {
 
   // Check if angle is close to optimal
   if (Math.abs(currentAngle - optimal) > tolerance) {
+    const hint = currentAngle < optimal ? 'straighten' : 'bend';
     return {
-      correction: `${joint}: Adjust to ${optimal}° (currently ${currentAngle}°)`,
+      correction: `Almost perfect! Just ${hint} your ${jointLabel.toLowerCase()} slightly.`,
       severity: 'warning',
       direction: currentAngle < optimal ? 'extend' : 'flex',
     };
   }
 
-  // Angle is perfect
   return {
     correction: null,
     severity: 'success',

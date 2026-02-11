@@ -77,7 +77,6 @@ const ReportsModal = ({ isOpen, onClose, patients }) => {
                         </div>
                         <div>
                             <h2 className="text-2xl font-black leading-none mb-1">Clinical Reports</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Gati Reporting Engine v2.0</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-3 hover:bg-white/10 rounded-2xl transition-colors">

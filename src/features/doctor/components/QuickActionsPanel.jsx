@@ -26,10 +26,10 @@ const QuickActionsPanel = ({ onActionClick }) => {
     },
     {
       id: 'neural-chat',
-      label: 'Neural Engine',
-      icon: Sparkles,
+      label: 'Neural Chat',
+      icon: MessageSquare,
       color: 'orange',
-      description: 'AI-powered insights',
+      description: 'AI-assisted patient messaging',
     }
   ];
 
@@ -58,7 +58,6 @@ const QuickActionsPanel = ({ onActionClick }) => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-xl font-black text-slate-900 leading-none">Quick Actions</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Efficiency Tools</p>
         </div>
         <Sparkles className="w-5 h-5 text-blue-400" />
       </div>

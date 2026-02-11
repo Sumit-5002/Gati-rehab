@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -6,26 +5,27 @@ import {
   Play,
   Pause,
   StopCircle,
-  AlertCircle,
-  CheckCircle,
   Activity,
   Timer,
-  BarChart3,
   Award,
   Terminal,
   FlaskConical,
-  ChevronDown
+  Info,
+  Maximize2,
+  Minimize2,
+  Monitor
 } from 'lucide-react';
 import AIEngine from '../../ai/components/AIEngine';
 import NavHeader from '../../../shared/components/NavHeader';
+import ExerciseDemo from '../components/ExerciseDemo';
 import { useAuth } from '../../auth/context/AuthContext';
 import { saveSession } from '../services/sessionService';
+import { markExerciseCompleted } from '../services/patientService';
 import { calculateFormQualityScore, trackRangeOfMotion } from '../utils/enhancedScoring';
 import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
 import { getPrimaryAngle } from '../../ai/utils/angleCalculations';
 import { logAction } from '../../../shared/utils/auditLogger';
 
-// Move static helper functions outside to avoid recreation on every render
 const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -45,11 +45,13 @@ const WorkoutSession = () => {
   const [formQuality, setFormQuality] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const frameDataRef = useRef([]); // Use ref for high-frequency data to avoid re-renders
+  const frameDataRef = useRef([]);
   const [realTimeFeedback, setRealTimeFeedback] = useState(null);
   const [isDevMode, setIsDevMode] = useState(location.state?.devMode || false);
+  const [modelStatus, setModelStatus] = useState({ isLoaded: false, error: null });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDemoOverlay, setShowDemoOverlay] = useState(true);
 
-  // Memoize static exercise list derived from constant
   const availableExercises = useMemo(() => Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
     id,
     name: data.name
@@ -57,9 +59,7 @@ const WorkoutSession = () => {
 
   const timerRef = useRef(null);
   const previousPhaseRef = useRef('start');
-  const angleHistoryRef = useRef([]);
 
-  // Memoize AI settings to prevent AIEngine (memoized) from re-rendering on every frame
   const aiSettings = useMemo(() => ({
     audioCues: userData?.audioCues,
     motionFeedback: userData?.motionFeedback
@@ -72,40 +72,82 @@ const WorkoutSession = () => {
     }
   }, [currentExercise]);
 
-  // Detect when a rep is completed
   const detectRepCompletion = useCallback((angles) => {
     const primaryAngle = getPrimaryAngle(angles, currentExercise);
 
-    // Exercise patterns:
-    // Type A (Decreasing): Start ~180, Goal < 110 (e.g. Knee Bends, Squats, Hip Flexion)
-    // Type B (Increasing): Start ~0, Goal > 120 (e.g. Shoulder Raises)
+    // Define exercise-specific logic
+    let isIncreasing = false;
+    let peakThreshold = 0;
+    let returnThreshold = 0;
 
-    const isIncreasingExercise = currentExercise.includes('shoulder') || currentExercise.includes('arm');
+    switch (currentExercise) {
+      case 'shoulder-raises':
+      case 'arm-raise':
+        isIncreasing = true;
+        peakThreshold = 80;   // Degrees (Start at ~10, lift to 90)
+        returnThreshold = 30; // Return below 30
+        break;
 
-    if (isIncreasingExercise) {
-      // Type B: Increasing Angle
-      const thresholdHigh = 130; // Peak
-      const thresholdLow = 50;   // Return
+      case 'knee-bends':
+      case 'squats':
+      case 'squat':
+        isIncreasing = false;
+        peakThreshold = 140;   // Start 180, bend to < 140
+        returnThreshold = 165; // Return to > 165
+        break;
 
-      if (primaryAngle > thresholdHigh && previousPhaseRef.current !== 'peak') {
+      case 'leg-raises':
+      case 'leg-raise':
+      case 'hip-flexion':
+      case 'standing-march':
+        isIncreasing = false;
+        peakThreshold = 135;   // Hip flexion decreases angle from 180
+        returnThreshold = 160;
+        break;
+
+      case 'elbow-flexion':
+      case 'elbow-flex':
+        isIncreasing = false;
+        peakThreshold = 70;    // Bend arm to < 70
+        returnThreshold = 140; // Straighten arm > 140
+        break;
+
+      case 'lateral-leg-raises':
+        isIncreasing = false;
+        peakThreshold = 145;   // Side lift: angle decreases from 180 to ~140
+        returnThreshold = 165;
+        break;
+
+      case 'calf-raises':
+        isIncreasing = true;
+        peakThreshold = 135;   // Ankle extension increases angle from ~100 to 140+
+        returnThreshold = 115;
+        break;
+
+      case 'arm-circles':
+        isIncreasing = true;
+        peakThreshold = 120;   // Abduction increases angle from 0 to ~90+
+        returnThreshold = 60;
+        break;
+
+      default:
+        isIncreasing = false;
+        peakThreshold = 140;
+        returnThreshold = 160;
+    }
+
+    if (isIncreasing) {
+      if (primaryAngle > peakThreshold && previousPhaseRef.current !== 'peak') {
         previousPhaseRef.current = 'peak';
-      } else if (primaryAngle < thresholdLow && previousPhaseRef.current === 'peak') {
+      } else if (primaryAngle < returnThreshold && previousPhaseRef.current === 'peak') {
         setRepCount(prev => prev + 1);
         previousPhaseRef.current = 'return';
         updateQualityScore();
       }
     } else {
-      // Type A: Decreasing Angle
-      let thresholdLow = 110;  // Peak (max flexion)
-      let thresholdHigh = 155; // Return (extension)
-
-      if (currentExercise.includes('hip') || currentExercise.includes('march')) {
-        thresholdLow = 120;
-      }
-
-      if (primaryAngle < thresholdLow && previousPhaseRef.current !== 'peak') {
+      if (primaryAngle < peakThreshold && previousPhaseRef.current !== 'peak') {
         previousPhaseRef.current = 'peak';
-      } else if (primaryAngle > thresholdHigh && previousPhaseRef.current === 'peak') {
+      } else if (primaryAngle > returnThreshold && previousPhaseRef.current === 'peak') {
         setRepCount(prev => prev + 1);
         previousPhaseRef.current = 'return';
         updateQualityScore();
@@ -113,34 +155,25 @@ const WorkoutSession = () => {
     }
   }, [currentExercise, updateQualityScore]);
 
-  // Handle pose detection from AIEngine
+  const handleStatusChange = useCallback((status) => {
+    setModelStatus(status);
+  }, []);
+
   const handlePoseDetected = useCallback((poseData) => {
     if (!sessionActive) return;
-
     const { angles, feedback: rtFeedback, timestamp } = poseData;
-
-    // Store frame data for later analysis (limited to prevent memory issues)
-    // Store frame data for later analysis
     frameDataRef.current = [...frameDataRef.current, { angles, timestamp, feedback: rtFeedback }].slice(-1000);
-
-    // Update current angle dynamically based on exercise
     const primaryAngle = getPrimaryAngle(angles, currentExercise);
     if (primaryAngle !== undefined) {
       setCurrentAngle(Math.round(primaryAngle));
-      angleHistoryRef.current.push(primaryAngle);
     }
-
-    // Update feedback display
     if (rtFeedback) {
       setFeedback(rtFeedback.message);
       setRealTimeFeedback(rtFeedback);
     }
-
-    // Detect rep completion
     detectRepCompletion(angles);
   }, [sessionActive, detectRepCompletion, currentExercise]);
 
-  // Timer effect
   useEffect(() => {
     if (sessionActive) {
       timerRef.current = setInterval(() => {
@@ -156,43 +189,29 @@ const WorkoutSession = () => {
     setSessionActive(true);
     if (!sessionStartTime) setSessionStartTime(Date.now());
     setFeedback('Great! Start your first rep');
-    if (user) {
-      await logAction(user.uid, 'WORKOUT_START', { exercise: currentExercise });
-    }
+    if (user) await logAction(user.uid, 'WORKOUT_START', { exercise: currentExercise });
   };
 
-  const handlePauseSession = async () => {
+  const handlePauseSession = () => {
     setSessionActive(false);
     setFeedback('Session paused');
-    if (user) {
-      await logAction(user.uid, 'WORKOUT_PAUSE', { exercise: currentExercise, elapsedSeconds: elapsedTime });
-    }
   };
 
   const handleEndSession = async () => {
     setSessionActive(false);
-
     const finalQuality = calculateFormQualityScore(frameDataRef.current, currentExercise);
-    const rom = trackRangeOfMotion(frameDataRef.current, currentExercise);
-
     const sessionData = {
       exerciseName: currentExercise,
       reps: repCount,
       quality: finalQuality.overallScore,
-      rangeOfMotion: Math.round(rom.maxROM || 0),
       duration: formatTime(elapsedTime),
       durationSeconds: elapsedTime,
       grade: finalQuality.grade
     };
-
     try {
       if (user) {
-        await logAction(user.uid, 'WORKOUT_FINISH', {
-          exercise: currentExercise,
-          reps: repCount,
-          quality: finalQuality.overallScore
-        });
         await saveSession(sessionData, user.uid);
+        await markExerciseCompleted(user.uid, currentExercise);
       }
       navigate('/patient-dashboard', { state: { sessionCompleted: true } });
     } catch (error) {
@@ -202,7 +221,7 @@ const WorkoutSession = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white pb-28">
+    <div className="min-h-screen bg-[#0F172A] text-white">
       <NavHeader userType="patient" theme="dark" />
 
       <main role="main" className="max-w-7xl mx-auto px-4 py-6">
@@ -210,39 +229,64 @@ const WorkoutSession = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <button
             onClick={() => navigate('/patient-dashboard')}
-            className="p-2.5 w-10 h-10 bg-slate-800/50 rounded-xl border border-slate-700/50 text-slate-400 active:scale-90 transition-all"
+            className="p-2.5 w-10 h-10 bg-slate-800/50 rounded-xl border border-slate-700/50 text-slate-400 active:scale-90 transition-all font-bold"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <div className="hidden sm:flex items-center gap-2 flex-wrap">
-            <div className="bg-slate-900/80 border border-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <Timer className="w-3 h-3 text-blue-400" />
-              <span className="text-sm font-mono font-bold tracking-tight">{formatTime(elapsedTime)}</span>
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <div className="bg-slate-900/40 border border-white/5 px-3 sm:px-4 py-2 rounded-xl flex items-center gap-2 shrink-0">
+              <Timer className="w-3.5 h-3.5 text-blue-400" />
+              <div className="flex flex-col">
+                <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase leading-none mb-1">DURATION</span>
+                <span className="text-xs sm:text-sm font-black tracking-tighter leading-none">{formatTime(elapsedTime)}</span>
+              </div>
             </div>
-            <div className="bg-slate-900/80 border border-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <Award className="w-3 h-3 text-amber-400" />
-              <span className="text-sm font-bold tracking-tight">{formQuality}%</span>
+            <div className="bg-slate-900/40 border border-white/5 px-3 sm:px-4 py-2 rounded-xl flex items-center gap-2 shrink-0">
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="flex flex-col">
+                <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase leading-none mb-1">FORM QUALITY</span>
+                <span className="text-xs sm:text-sm font-black tracking-tighter leading-none">{formQuality}%</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/40 border border-white/5 px-3 sm:px-4 py-2 rounded-xl flex items-center gap-2 shrink-0">
+              <Activity className="w-3.5 h-3.5 text-orange-400" />
+              <div className="flex flex-col">
+                <span className="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase leading-none mb-1">RANGE OF MOTION</span>
+                <span className="text-xs sm:text-sm font-black tracking-tighter leading-none">{currentAngle}°</span>
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsDevMode(!isDevMode)}
-            className={`hidden sm:inline-flex p-2.5 rounded-xl border transition-all active:scale-90 self-start sm:self-auto ${isDevMode ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-500 border-slate-700/50'}`}
-            aria-label="Toggle developer mode"
-          >
-            <Terminal className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDemoOverlay(!showDemoOverlay)}
+              className={`p-2.5 rounded-xl border transition-all active:scale-90 ${showDemoOverlay ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-500 border-slate-700/50'}`}
+              title="Toggle Demo Overlay"
+            >
+              <Monitor className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`p-2.5 rounded-xl border transition-all active:scale-90 ${isFullscreen ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'bg-slate-800/50 text-slate-500 border-slate-700/50'}`}
+              title="Toggle Immersive View"
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => setIsDevMode(!isDevMode)}
+              className={`hidden sm:inline-flex p-2.5 rounded-xl border transition-all active:scale-90 ${isDevMode ? 'bg-blue-600 text-white' : 'bg-slate-800/50 text-slate-500 border-slate-700/50'}`}
+            >
+              <Terminal className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {isDevMode && (
-          <div className="hidden sm:block mb-4 p-3 bg-slate-900/50 border border-white/5 rounded-2xl animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-600/10 border border-blue-500/20 rounded-lg shrink-0">
-                <FlaskConical className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Models</span>
-              </div>
+          <div className="mb-4 p-4 bg-slate-900/50 border border-white/5 rounded-[2rem]">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-2">Override Exercise</p>
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
               {availableExercises.map((ex) => (
                 <button
                   key={ex.id}
@@ -250,10 +294,11 @@ const WorkoutSession = () => {
                     setCurrentExercise(ex.id);
                     setRepCount(0);
                     frameDataRef.current = [];
+                    previousPhaseRef.current = 'start';
                   }}
-                  className={`whitespace-nowrap px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${currentExercise === ex.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-500'
+                  className={`whitespace-nowrap px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${currentExercise === ex.id
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                    : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
                     }`}
                 >
                   {ex.name}
@@ -263,121 +308,133 @@ const WorkoutSession = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className={`grid grid-cols-1 ${isFullscreen ? '' : 'lg:grid-cols-12'} gap-4 lg:gap-8 transition-all duration-500`}>
           {/* Main Viewport */}
-          <div className="lg:col-span-3 space-y-6">
-            <div className="relative rounded-[2rem] sm:rounded-[2.5rem] border border-white/5 bg-slate-950 shadow-inner group">
-              {/* Visual Feedback Overlay Border */}
-              <div
-                className="absolute inset-0 pointer-events-none z-20 transition-all duration-300"
-                style={{
-                  boxShadow: realTimeFeedback?.severity === 'error' ? 'inset 0 0 40px rgba(239, 68, 68, 0.3)' :
-                    realTimeFeedback?.severity === 'warning' ? 'inset 0 0 40px rgba(245, 158, 11, 0.2)' : 'none'
-                }}
-              ></div>
+          <div className={`${isFullscreen ? 'lg:col-span-12' : 'lg:col-span-8'} space-y-4 lg:space-y-6`}>
+            <div className={`relative ${isFullscreen ? 'h-[75vh] lg:h-[750px] rounded-[2.5rem]' : 'h-[50vh] lg:h-[600px] rounded-[2.5rem]'} border border-white/5 bg-slate-950 shadow-2xl overflow-hidden transition-all duration-500`}>
+              <AIEngine
+                onPoseDetected={handlePoseDetected}
+                exerciseType={currentExercise}
+                onStatusChange={handleStatusChange}
+                repCount={repCount}
+                settings={aiSettings}
+              />
 
-              <div className="w-full h-full scale-100 md:scale-[1.01] lg:scale-[1.02]">
-                <AIEngine
-                  onPoseDetected={handlePoseDetected}
-                  exerciseType={currentExercise}
-                  repCount={repCount}
-                  settings={aiSettings}
-                />
+              {/* Demo Overlay (Premium PiP) */}
+              {showDemoOverlay && (
+                <div className="absolute top-4 left-4 z-30 w-32 sm:w-56 aspect-[4/5] rounded-[2rem] overflow-hidden border border-white/10 bg-slate-950/80 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-500">
+                  <div className="absolute inset-0 bg-blue-500/5 pointer-events-none"></div>
+
+                  {/* PiP Header */}
+                  <div className="absolute top-0 inset-x-0 h-10 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between px-4 z-40">
+                    <span className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em]">Neural Guide</span>
+                    <button
+                      onClick={() => setShowDemoOverlay(false)}
+                      className="w-6 h-6 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-xs font-bold text-white transition-all active:scale-90"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <ExerciseDemo
+                    exerciseId={currentExercise}
+                    exerciseData={AVAILABLE_EXERCISES[currentExercise]}
+                    isCompact={true}
+                  />
+
+                  {/* Bottom Indicator */}
+                  <div className="absolute bottom-3 inset-x-0 flex justify-center pointer-events-none">
+                    <div className="px-2 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 backdrop-blur-md">
+                      <p className="text-[6px] font-black text-blue-300 uppercase tracking-tighter">Live Kinematics</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shrunken Feedback Overlay */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-fit">
+                <div className={`px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-300 ${realTimeFeedback?.severity === 'error' ? 'bg-rose-500/20 border-rose-500/30' :
+                  'bg-black/80 border-white/10'
+                  }`}>
+                  <Activity className={`w-4 h-4 ${realTimeFeedback?.severity === 'error' ? 'text-rose-500' : 'text-blue-400 animate-pulse'}`} />
+                  <p className="text-[10px] font-black tracking-widest text-white uppercase">{feedback}</p>
+                </div>
               </div>
-
-            </div>
-
-            {/* Feedback Card */}
-            <div className="mt-3 bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${realTimeFeedback?.severity === 'error' ? 'bg-rose-500/20 text-rose-500' : 'bg-blue-500/20 text-blue-400'}`}>
-                <Activity className="w-4 h-4 animate-pulse" />
-              </div>
-              <p className="text-[13px] font-bold text-white leading-tight">
-                {feedback}
-              </p>
             </div>
 
             {/* Controls */}
-            <div className="pt-2">
+            <div className="bg-slate-900/40 backdrop-blur-xl p-2.5 sm:p-3 rounded-[2rem] sm:rounded-[2.5rem] border border-white/5 flex items-center gap-3 sm:gap-4">
               {!sessionActive ? (
                 <button
                   onClick={handleStartSession}
-                  className="w-full py-5 bg-blue-600 active:bg-blue-700 text-white font-black rounded-2xl text-lg shadow-xl shadow-blue-900/40 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                  className="w-full py-4 sm:py-6 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-[1.5rem] sm:rounded-[2rem] text-lg sm:text-xl shadow-2xl shadow-blue-900/40 transition-all transform active:scale-95 flex items-center justify-center gap-3 sm:gap-4 group"
                 >
-                  <Play className="w-6 h-6 fill-current" />
-                  <span>START TRAINING</span>
+                  <Play className="w-6 h-6 sm:w-8 sm:h-8 fill-current group-hover:scale-110 transition-transform" />
+                  <span>INITIALIZE SESSION</span>
                 </button>
               ) : (
-                <div className="flex gap-4">
-                  <button
-                    onClick={handlePauseSession}
-                    className="flex-1 py-4 bg-slate-800 text-white font-black rounded-2xl text-base active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Pause className="w-5 h-5 fill-current" />
-                    PAUSE
+                <div className="flex w-full gap-3">
+                  <button onClick={handlePauseSession} className="flex-1 py-4 sm:py-6 bg-slate-800 text-white font-black rounded-[1.5rem] sm:rounded-[2rem] text-sm sm:text-lg flex items-center justify-center gap-2 sm:gap-3 hover:bg-slate-700 transition-all">
+                    <Pause className="w-5 h-5 sm:w-6 sm:h-6 fill-current" /> PAUSE
                   </button>
-                  <button
-                    onClick={handleEndSession}
-                    className="flex-1 py-4 bg-rose-600 text-white font-black rounded-2xl text-base active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-900/20"
-                  >
-                    <StopCircle className="w-5 h-5 fill-current" />
-                    FINISH
+                  <button onClick={handleEndSession} className="flex-1 py-4 sm:py-6 bg-rose-600 text-white font-black rounded-[1.5rem] sm:rounded-[2rem] text-sm sm:text-lg flex items-center justify-center gap-2 sm:gap-3 hover:bg-rose-500 transition-all shadow-xl shadow-rose-900/20">
+                    <StopCircle className="w-5 h-5 sm:w-6 sm:h-6 fill-current" /> FINISH
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Metrics - More compact for mobile */}
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-            <div className="bg-slate-900/50 rounded-xl sm:rounded-2xl border border-white/5 p-3 sm:p-4 flex flex-col justify-center">
-              <div className="flex justify-between items-end mb-1 sm:mb-2">
-                <div>
-                  <p className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Live Feed</p>
-                  <p className="text-[10px] sm:text-xs font-bold text-slate-300">Joint Angle</p>
+          {/* Exercise Guide (Hidden in Fullscreen) */}
+          {!isFullscreen && (
+            <div className="lg:col-span-4 space-y-6">
+              <div className="hidden lg:block bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[3rem] p-8 shadow-2xl">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-sm font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Anatomical Lab</h3>
+                    <p className="text-xl font-black text-white">{AVAILABLE_EXERCISES[currentExercise]?.name || 'Loading'}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
+                    <Info className="w-5 h-5 text-blue-400" />
+                  </div>
                 </div>
-                <span className="text-lg sm:text-2xl font-black text-blue-400">{currentAngle}°</span>
-              </div>
-              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${currentAngle / 1.8}%` }}></div>
-              </div>
-            </div>
 
-            <div className="bg-slate-900/50 rounded-xl sm:rounded-2xl border border-white/5 p-3 sm:p-4 flex flex-col justify-center">
-              <div className="flex justify-between items-end mb-1 sm:mb-2">
-                <div>
-                  <p className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Neural AI</p>
-                  <p className="text-[10px] sm:text-xs font-bold text-slate-300">Form Quality</p>
+                <ExerciseDemo
+                  exerciseId={currentExercise}
+                  exerciseData={AVAILABLE_EXERCISES[currentExercise]}
+                  isCompact={true}
+                />
+
+                <div className="mt-8 pt-8 border-t border-white/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target Angle</span>
+                    <span className="text-xs font-bold text-white">45° - 180° Range</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Intensity</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className={`w-3 h-1 rounded-full ${i <= 2 ? 'bg-blue-500' : 'bg-slate-700'}`}></div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <span className="text-lg sm:text-2xl font-black text-emerald-400">{formQuality}%</span>
               </div>
-              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${formQuality}%` }}></div>
+
+              {/* Neural Summary Grid */}
+              <div className="bg-slate-900/50 rounded-3xl border border-white/5 p-6 text-center">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2 italic">Neural engine optimizing scale and intensity...</p>
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                  <span className="text-xs font-bold text-blue-200 uppercase tracking-widest">Neural Engine Syncing</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
   );
 };
-
-const MetricBox = ({ label, value, subvalue, progress, color = 'emerald' }) => (
-  <div className="relative">
-    <div className="flex justify-between items-end mb-2">
-      <div>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</p>
-        <p className="text-sm font-bold text-slate-300">{subvalue}</p>
-      </div>
-      <span className="text-2xl font-black">{value}</span>
-    </div>
-    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-      <div
-        className={`h-full transition-all duration-300 ${color === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}
-        style={{ width: `${progress}%` }}
-      ></div>
-    </div>
-  </div>
-);
 
 export default WorkoutSession;

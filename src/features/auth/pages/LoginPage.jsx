@@ -12,33 +12,37 @@ import {
   DEMO_CREDENTIALS,
 } from '../services/authService';
 import { logAction } from '../../../shared/utils/auditLogger';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 // Updated Input to handle disabled state styling
-const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ringColor, textColor, suffix, ...props }) => (
-  <div className="relative group">
-    {icon && (
-      <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors ${textColor === 'text-blue-600' ? 'group-focus-within:text-blue-600' : textColor === 'text-teal-600' ? 'group-focus-within:text-teal-600' : 'group-focus-within:text-slate-800'}`}>
-        {icon}
-      </div>
-    )}
-    <input
-      id={id}
-      name={name}
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full ${icon ? 'pl-11' : 'px-4'} ${suffix ? 'pr-12' : 'pr-4'} py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100 ${ringColor} ${className}`}
-      {...props}
-      required
-    />
-    {suffix && (
-      <div className="absolute right-4 top-1/2 -translate-y-1/2">
-        {suffix}
-      </div>
-    )}
-  </div>
-);
+const Input = ({ icon, type, placeholder, value, onChange, id, name, className = '', ringColor, textColor, suffix, ...props }) => {
+  const { isDarkMode } = useTheme();
+  return (
+    <div className="relative group">
+      {icon && (
+        <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-500' : 'text-slate-400'} transition-colors ${textColor === 'text-blue-600' ? 'group-focus-within:text-blue-600' : textColor === 'text-teal-600' ? 'group-focus-within:text-teal-600' : 'group-focus-within:text-slate-800'}`}>
+          {icon}
+        </div>
+      )}
+      <input
+        id={id}
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full ${icon ? 'pl-11' : 'px-4'} ${suffix ? 'pr-12' : 'pr-4'} py-3.5 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white focus:bg-gray-900' : 'bg-slate-50 border-slate-200 text-slate-800 focus:bg-white'} border rounded-xl focus:ring-2 focus:ring-opacity-20 focus:border-transparent outline-none transition-all font-medium placeholder:text-slate-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100 ${ringColor} ${className}`}
+        {...props}
+        required
+      />
+      {suffix && (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+          {suffix}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PrimaryButton = ({ loading, text, bgColor, bgHoverColor }) => (
   <button
@@ -53,6 +57,7 @@ const PrimaryButton = ({ loading, text, bgColor, bgHoverColor }) => (
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDarkMode } = useTheme();
   const [userType, setUserType] = useState('patient'); // 'patient', 'doctor', 'admin'
   const [authMode, setAuthMode] = useState('email'); // 'email', 'phone', 'forgot'
   const [isSignUp, setIsSignUp] = useState(false);
@@ -73,15 +78,15 @@ const LoginPage = () => {
           bgHoverColor: 'hover:bg-teal-700',
           textColor: 'text-teal-600',
           ringColor: 'focus:ring-teal-500',
-          gradient: 'from-teal-50 via-emerald-50 to-white'
+          gradient: isDarkMode ? 'from-teal-900 via-gray-900 to-black' : 'from-teal-50 via-emerald-50 to-white'
         };
       case 'admin':
         return {
           bgColor: 'bg-slate-800',
           bgHoverColor: 'hover:bg-slate-900',
-          textColor: 'text-slate-800',
+          textColor: isDarkMode ? 'text-slate-300' : 'text-slate-800',
           ringColor: 'focus:ring-slate-500',
-          gradient: 'from-slate-100 via-gray-100 to-white'
+          gradient: isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-slate-100 via-gray-100 to-white'
         };
       default: // patient
         return {
@@ -89,7 +94,7 @@ const LoginPage = () => {
           bgHoverColor: 'hover:bg-blue-700',
           textColor: 'text-blue-600',
           ringColor: 'focus:ring-blue-500',
-          gradient: 'from-blue-50 via-indigo-50 to-white'
+          gradient: isDarkMode ? 'from-blue-900 via-gray-900 to-black' : 'from-blue-50 via-indigo-50 to-white'
         };
     }
   };
@@ -213,37 +218,37 @@ const LoginPage = () => {
   };
 
   return (
-    <main className={`min-h-screen bg-gradient-to-br ${gradient} flex items-center justify-center p-4 sm:p-6 font-sans transition-colors duration-500`}>
-      <div className="bg-white rounded-[2rem] shadow-2xl max-w-[28rem] w-full overflow-hidden border border-slate-100">
+    <main className={`min-h-screen bg-gradient-to-br ${gradient} flex items-center justify-center p-4 sm:p-6 font-sans transition-all duration-500 ${isDarkMode ? 'dark' : ''}`}>
+      <div className={`rounded-[2rem] shadow-2xl max-w-[28rem] w-full overflow-hidden border ${isDarkMode ? 'bg-gray-900 border-gray-800 shadow-blue-900/10' : 'bg-white border-slate-100'}`}>
 
         {/* Header Section with Dynamic Branding */}
-        <div className="pt-8 pb-6 px-8 text-center bg-white relative">
+        <div className={`pt-8 pb-6 px-8 text-center relative ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
           <button
             onClick={() => navigate('/')}
-            className="absolute left-6 top-6 p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+            className={`absolute left-6 top-6 p-2 rounded-xl transition-colors ${isDarkMode ? 'text-gray-500 hover:bg-gray-800 hover:text-gray-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
             aria-label="Back to home"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex justify-center mb-6">
-            <div className={`p-3 rounded-2xl ${userType === 'patient' ? 'bg-blue-50' : userType === 'doctor' ? 'bg-teal-50' : 'bg-slate-100'} transition-colors duration-300`}>
+            <div className={`p-3 rounded-2xl ${userType === 'patient' ? (isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50') : userType === 'doctor' ? (isDarkMode ? 'bg-teal-900/30' : 'bg-teal-50') : (isDarkMode ? 'bg-gray-800' : 'bg-slate-100')} transition-colors duration-300`}>
               <img src="/logo.png" alt="Gati Logo" className="w-16 h-16 object-contain" />
             </div>
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">
+          <h1 className={`text-3xl font-black tracking-tight mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
             GATI<span className={`${textColor} transition-colors duration-300`}>REHAB</span>
           </h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
+          <p className={`${isDarkMode ? 'text-gray-400' : 'text-slate-500'} text-xs font-bold uppercase tracking-widest`}>
             {userType === 'patient' ? 'Patient Recovery Portal' : userType === 'doctor' ? 'Professional Clinical Suite' : 'System Administration'}
           </p>
         </div>
 
         {/* User Type Toggles - Distinct Visuals */}
         <div className="px-8 mb-6">
-          <div className="flex bg-slate-100 p-1 rounded-xl relative">
+          <div className={`flex ${isDarkMode ? 'bg-gray-800' : 'bg-slate-100'} p-1 rounded-xl relative`}>
             {/* Sliding Background */}
             <div
-              className={`absolute top-1 bottom-1 w-[calc(33.33%-4px)] rounded-lg bg-white shadow-sm transition-all duration-300 ease-in-out ${userType === 'patient' ? 'left-1' :
+              className={`absolute top-1 bottom-1 w-[calc(33.33%-4px)] rounded-lg shadow-sm transition-all duration-300 ease-in-out ${isDarkMode ? 'bg-gray-700' : 'bg-white'} ${userType === 'patient' ? 'left-1' :
                 userType === 'doctor' ? 'left-[33.33%]' :
                   'left-[66.66%]'
                 }`}
@@ -252,7 +257,7 @@ const LoginPage = () => {
             <button
               onClick={() => setUserType('patient')}
               disabled={loading}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'patient' ? 'text-blue-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'patient' ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-400 hover:text-white' : 'text-slate-600 hover:text-slate-800')} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'patient'}
             >
               <User className="w-3.5 h-3.5" />
@@ -261,7 +266,7 @@ const LoginPage = () => {
             <button
               onClick={() => setUserType('doctor')}
               disabled={loading}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'doctor' ? 'text-teal-700' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'doctor' ? (isDarkMode ? 'text-teal-400' : 'text-teal-700') : (isDarkMode ? 'text-gray-400 hover:text-white' : 'text-slate-600 hover:text-slate-800')} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'doctor'}
             >
               <Stethoscope className="w-3.5 h-3.5" />
@@ -270,7 +275,7 @@ const LoginPage = () => {
             <button
               onClick={() => setUserType('admin')}
               disabled={loading}
-              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'admin' ? 'text-slate-900' : 'text-slate-600 hover:text-slate-800'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-colors duration-300 ${userType === 'admin' ? (isDarkMode ? 'text-white' : 'text-slate-900') : (isDarkMode ? 'text-gray-400 hover:text-white' : 'text-slate-600 hover:text-slate-800')} disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-pressed={userType === 'admin'}
             >
               <Shield className="w-3.5 h-3.5" />
@@ -334,7 +339,7 @@ const LoginPage = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                        className={`${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-slate-400 hover:text-slate-600'} transition-colors focus:outline-none`}
                         aria-label={showPassword ? "Hide password" : "Show password"}
                       >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -354,7 +359,7 @@ const LoginPage = () => {
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-sm text-red-600 font-medium animate-shake">
+                  <div className={`p-3 border rounded-xl flex items-center gap-3 text-sm font-medium animate-shake ${isDarkMode ? 'bg-red-900/20 border-red-900/40 text-red-400' : 'bg-red-50 border-red-100 text-red-600'}`}>
                     <Activity className="w-4 h-4 shrink-0" />
                     {error}
                   </div>
@@ -390,10 +395,10 @@ const LoginPage = () => {
                 <>
                   <div className="relative py-2">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200"></div>
+                      <div className={`w-full border-t ${isDarkMode ? 'border-gray-800' : 'border-slate-200'}`}></div>
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="bg-white px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span className={`${isDarkMode ? 'bg-gray-900 text-gray-500' : 'bg-white text-slate-500'} px-4 text-[10px] font-bold uppercase tracking-wider`}>
                         Or continue with
                       </span>
                     </div>
@@ -405,7 +410,7 @@ const LoginPage = () => {
                       type="button"
                       onClick={handleGoogleLogin}
                       disabled={loading}
-                      className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
+                      className={`flex items-center justify-center gap-2.5 py-3 border rounded-xl font-bold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                       aria-label="Sign in with Google"
                     >
                       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
@@ -415,9 +420,9 @@ const LoginPage = () => {
                       type="button"
                       onClick={() => setAuthMode('phone')}
                       disabled={loading}
-                      className="flex items-center justify-center gap-2.5 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100"
+                      className={`flex items-center justify-center gap-2.5 py-3 border rounded-xl font-bold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                     >
-                      <Activity className="w-5 h-5 text-slate-400" />
+                      <Activity className={`w-5 h-5 ${isDarkMode ? 'text-gray-500' : 'text-slate-400'}`} />
                       <span className="text-sm">Phone</span>
                     </button>
                   </div>
@@ -443,8 +448,8 @@ const LoginPage = () => {
                 !otpSent ? (
                   <form onSubmit={handleSendOTP} className="space-y-4">
                     <div className="text-center mb-2">
-                      <h3 className="text-lg font-bold text-slate-800">Mobile Sign In</h3>
-                      <p className="text-slate-500 text-sm">We'll send a verification code to your phone.</p>
+                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Mobile Sign In</h3>
+                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-slate-500'} text-sm`}>We'll send a verification code to your phone.</p>
                     </div>
                     <Input
                       type="tel"
@@ -466,8 +471,8 @@ const LoginPage = () => {
                 ) : (
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
                     <div className="text-center mb-2">
-                      <h3 className="text-lg font-bold text-slate-800">Verify Number</h3>
-                      <p className="text-slate-500 text-sm">Enter the code sent to {phoneNumber}</p>
+                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Verify Number</h3>
+                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-slate-500'} text-sm`}>Enter the code sent to {phoneNumber}</p>
                     </div>
                     <Input
                       type="text"
@@ -493,8 +498,8 @@ const LoginPage = () => {
                 !resetSent ? (
                   <form onSubmit={handleResetPassword} className="space-y-4">
                     <div className="text-center mb-2">
-                      <h3 className="text-lg font-bold text-slate-800">Reset Password</h3>
-                      <p className="text-slate-500 text-sm">Enter your email to receive recovery instructions.</p>
+                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Reset Password</h3>
+                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-slate-500'} text-sm`}>Enter your email to receive recovery instructions.</p>
                     </div>
                     <Input
                       icon={<Mail className="w-5 h-5" />}
@@ -514,11 +519,11 @@ const LoginPage = () => {
                   </form>
                 ) : (
                   <div className="text-center py-6">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Mail className="w-8 h-8 text-green-600" />
+                    <div className={`w-16 h-16 ${isDarkMode ? 'bg-green-900/30' : 'bg-green-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                      <Mail className={`w-8 h-8 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">Check your inbox</h3>
-                    <p className="text-slate-500 text-sm mb-6">{success}</p>
+                    <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'} mb-2`}>Check your inbox</h3>
+                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-slate-500'} text-sm mb-6`}>{success}</p>
                     <button onClick={resetToEmail} disabled={loading} className={`w-full py-3 rounded-xl font-bold text-white ${bgColor} ${bgHoverColor} disabled:opacity-50 disabled:cursor-not-allowed`}>Return to Login</button>
                   </div>
                 )
@@ -528,7 +533,7 @@ const LoginPage = () => {
 
           {/* Quick Demo Link */}
           <div className="mt-8 text-center">
-            <button onClick={fillDemoCredentials} disabled={loading} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Fill form with demo credentials for testing">
+            <button onClick={fillDemoCredentials} disabled={loading} className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-slate-400 hover:text-slate-600'}`} aria-label="Fill form with demo credentials for testing">
               Activate Demo Credentials
             </button>
           </div>

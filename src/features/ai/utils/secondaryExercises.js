@@ -255,7 +255,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['ACL Recovery', 'Knee OA', 'Post-Fracture'],
     phase: 'Acute',
     sets: 3,
-    repsPerSet: 10
+    repsPerSet: 10,
+    demoType: 'animation', // 'animation' for stick figure, 'gif' for actual demo
+    instructions: [
+      'Stand with feet shoulder-width apart',
+      'Slowly bend your knees to 45-90 degrees',
+      'Keep your back straight and core engaged',
+      'Return to starting position slowly',
+      'Breathe out as you bend, in as you straighten'
+    ],
+    commonMistakes: [
+      'Bending knees past toes',
+      'Leaning forward too much',
+      'Moving too quickly'
+    ]
   },
   'leg-raises': {
     name: 'Leg Raises',
@@ -265,7 +278,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['Hip Replacement', 'ACL Recovery'],
     phase: 'Mid',
     sets: 3,
-    repsPerSet: 12
+    repsPerSet: 12,
+    demoType: 'animation',
+    instructions: [
+      'Stand straight, hold onto a chair for support',
+      'Lift one leg forward, keeping it straight',
+      'Raise to comfortable height (30-45 degrees)',
+      'Hold for 2 seconds, then lower slowly',
+      'Alternate legs between sets'
+    ],
+    commonMistakes: [
+      'Swinging the leg',
+      'Leaning backward',
+      'Lifting too high too soon'
+    ]
   },
   'standing-march': {
     name: 'Standing March',
@@ -275,7 +301,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['Stroke Recovery', 'General Mobility'],
     phase: 'Acute',
     sets: 3,
-    repsPerSet: 20
+    repsPerSet: 20,
+    demoType: 'animation',
+    instructions: [
+      'Stand upright with good posture',
+      'Lift one knee to hip height',
+      'Lower it back down with control',
+      'Alternate legs in a marching motion',
+      'Maintain steady rhythm'
+    ],
+    commonMistakes: [
+      'Leaning backward',
+      'Not lifting knee high enough',
+      'Moving too fast'
+    ]
   },
   'hip-flexion': {
     name: 'Hip Flexion',
@@ -285,7 +324,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['Hip OA', 'Post-Fracture'],
     phase: 'Acute',
     sets: 3,
-    repsPerSet: 10
+    repsPerSet: 10,
+    demoType: 'animation',
+    instructions: [
+      'Lie on your back or stand with support',
+      'Slowly lift one leg, bending at the hip',
+      'Bring knee toward chest',
+      'Hold for 2-3 seconds',
+      'Lower slowly and repeat'
+    ],
+    commonMistakes: [
+      'Arching the back',
+      'Moving too quickly',
+      'Not engaging core'
+    ]
   },
   'shoulder-raises': {
     name: 'Shoulder Raises',
@@ -295,7 +347,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['Shoulder Impingement', 'Stroke Recovery'],
     phase: 'Mid',
     sets: 3,
-    repsPerSet: 12
+    repsPerSet: 12,
+    demoType: 'animation',
+    instructions: [
+      'Stand with arms at your sides',
+      'Slowly raise both arms forward or to the side',
+      'Lift to shoulder height (90 degrees)',
+      'Hold for 1-2 seconds',
+      'Lower slowly with control'
+    ],
+    commonMistakes: [
+      'Shrugging shoulders',
+      'Raising arms too high',
+      'Using momentum instead of control'
+    ]
   },
   'elbow-flexion': {
     name: 'Elbow Flexion',
@@ -305,7 +370,20 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['Stroke Recovery', 'General Mobility'],
     phase: 'Acute',
     sets: 2,
-    repsPerSet: 15
+    repsPerSet: 15,
+    demoType: 'animation',
+    instructions: [
+      'Sit or stand with arm at your side',
+      'Slowly bend elbow, bringing hand toward shoulder',
+      'Keep upper arm still',
+      'Straighten arm back to starting position',
+      'Maintain smooth, controlled movement'
+    ],
+    commonMistakes: [
+      'Moving the shoulder',
+      'Swinging the arm',
+      'Not completing full range of motion'
+    ]
   },
   'squats': {
     name: 'Squats',
@@ -315,6 +393,89 @@ export const AVAILABLE_EXERCISES = {
     suitableFor: ['ACL Recovery', 'Knee OA'],
     phase: 'Advanced',
     sets: 3,
-    repsPerSet: 10
+    repsPerSet: 10,
+    demoType: 'animation',
+    instructions: [
+      'Stand with feet shoulder-width apart',
+      'Lower your body by bending knees and hips',
+      'Keep chest up and back straight',
+      'Go down until thighs are parallel to ground',
+      'Push through heels to return to standing'
+    ],
+    commonMistakes: [
+      'Knees caving inward',
+      'Heels lifting off ground',
+      'Leaning too far forward',
+      'Not going deep enough'
+    ]
+  },
+  'lateral-leg-raises': {
+    name: 'Lateral Leg Raises',
+    description: 'Lift your leg out to the side',
+    difficulty: 'Medium',
+    intensity: 0.5,
+    suitableFor: ['Hip Stability', 'ACL Recovery'],
+    phase: 'Mid',
+    sets: 3,
+    repsPerSet: 12,
+    demoType: 'animation',
+    instructions: [
+      'Stand straight with support',
+      'Lift one leg out to the side (30-45 degrees)',
+      'Keep your toes pointing forward',
+      'Lower slowly with control',
+      'Keep your torso upright'
+    ],
+    commonMistakes: [
+      'Leaning to the opposite side',
+      'Rotating your foot outward',
+      'Moving too fast'
+    ]
+  },
+  'arm-circles': {
+    name: 'Arm Circles',
+    description: 'Rotate your arms in controlled circles',
+    difficulty: 'Easy',
+    intensity: 0.3,
+    suitableFor: ['Shoulder Mobility', 'Post-Op Rehab'],
+    phase: 'Acute',
+    sets: 3,
+    repsPerSet: 15,
+    demoType: 'animation',
+    instructions: [
+      'Stand with arms out at shoulder height',
+      'Make small, controlled circular motions',
+      'Keep your shoulders relaxed (don\'t shrug)',
+      'Reverse direction halfway through',
+      'Maintain steady breathing'
+    ],
+    commonMistakes: [
+      'Circles are too large/uncontrolled',
+      'Shrugging shoulders',
+      'Bending elbows'
+    ]
+  },
+  'calf-raises': {
+    name: 'Calf Raises',
+    description: 'Lift your heels off the ground',
+    difficulty: 'Easy',
+    intensity: 0.4,
+    suitableFor: ['Ankle Stability', 'Achilles Rehab'],
+    phase: 'Acute',
+    sets: 3,
+    repsPerSet: 15,
+    demoType: 'animation',
+    instructions: [
+      'Stand with feet shoulder-width apart',
+      'Slowly lift your heels as high as possible',
+      'Hold the peak for 1 second',
+      'Lower back down slowly',
+      'Use a wall or chair for balance'
+    ],
+    commonMistakes: [
+      'Rushing the movement',
+      'Not going through full range of motion',
+      'Leaning forward'
+    ]
   },
 };

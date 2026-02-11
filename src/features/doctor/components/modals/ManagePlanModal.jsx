@@ -7,6 +7,7 @@ import {
   addMedication,
   deleteMedication
 } from '../../services/doctorService';
+import { AVAILABLE_EXERCISES } from '../../../ai/utils/secondaryExercises';
 
 const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,12 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
     duration: '8 Weeks',
     observations: 'Focus on consistency over intensity.'
   });
+
+  const [showExerciseSearch, setShowExerciseSearch] = useState(false);
+  const exerciseList = Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
+    id,
+    ...data
+  }));
 
   const [meds, setMeds] = useState([]);
   const [newMed, setNewMed] = useState({ name: '', dosage: '', time: '', duration: '7' });
@@ -198,11 +205,43 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                       <Dumbbell className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Exercise Name"
-                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        placeholder="Select or Search Exercise..."
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all cursor-pointer"
                         value={newExercise.name}
-                        onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
+                        onClick={() => setShowExerciseSearch(!showExerciseSearch)}
+                        onChange={(e) => {
+                          setNewExercise({ ...newExercise, name: e.target.value });
+                          setShowExerciseSearch(true);
+                        }}
+                        readOnly={!showExerciseSearch}
                       />
+
+                      {showExerciseSearch && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto overflow-x-hidden p-1">
+                          {exerciseList
+                            .filter(ex => ex.name.toLowerCase().includes(newExercise.name.toLowerCase()))
+                            .map(ex => (
+                              <button
+                                key={ex.id}
+                                className="w-full text-left px-4 py-2 hover:bg-slate-100 rounded-lg flex items-center justify-between group transition-colors"
+                                onClick={() => {
+                                  setNewExercise({
+                                    ...newExercise,
+                                    name: ex.name,
+                                    exerciseId: ex.id // Store the actual ID for the engine
+                                  });
+                                  setShowExerciseSearch(false);
+                                }}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-slate-800">{ex.name}</span>
+                                  <span className="text-[10px] text-slate-400 uppercase font-black">{ex.difficulty} • {ex.phase} Phase</span>
+                                </div>
+                                <Plus className="w-4 h-4 text-slate-200 group-hover:text-blue-500" />
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-span-4 md:col-span-2">

@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { X, Send, User, Bot, Sparkles, MessageSquare, ShieldCheck } from 'lucide-react';
+import { X, Send, User, Bot, Sparkles, MessageSquare, ShieldCheck, Loader2 } from 'lucide-react';
 import { useEscapeKey } from '../../../../shared/hooks/useEscapeKey';
 import { useAuth } from '../../../auth/context/AuthContext';
 import { sendMessage, subscribeToMessages, getChatId } from '../../../chat/services/chatService';
@@ -44,7 +44,7 @@ const NeuralChatModal = ({ isOpen, onClose, chatPartnerId = null, chatPartnerNam
     }, [messages]);
 
     const handleSend = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (!input.trim() || isTyping) return;
 
         const userMsgText = input;
@@ -65,18 +65,14 @@ const NeuralChatModal = ({ isOpen, onClose, chatPartnerId = null, chatPartnerNam
                 let aiResponseText;
                 try {
                     // Get history for context
-                    const history = messages.slice(-5); // Use last 5 messages for context
-                    aiResponseText = await getGeminiResponse(userMsgText, history);
+                    const history = messages.slice(-5).map(m => ({
+                        sender: m.sender === 'ai' ? 'ai' : 'user',
+                        text: m.text
+                    }));
+                    aiResponseText = await getGeminiResponse(`You are Gati's Neural Assistant. ${userData?.userType === 'doctor' ? 'Focus on clinical data analysis and patient monitoring.' : 'Focus on recovery and encouragement.'}`, history);
                 } catch (geminiError) {
                     console.error('[NeuralChat] Gemini API error:', geminiError);
-                    // Provide helpful fallback response
-                    if (geminiError.message?.includes('API Key')) {
-                        aiResponseText = "⚠️ Neural AI is not configured. To enable AI-powered insights, please add your Google Gemini API key to the .env file as VITE_GEMINI_API_KEY. For now, I can still help with basic queries!";
-                    } else {
-                        aiResponseText = userData?.userType === 'doctor'
-                            ? "I'm analyzing your clinical data. Your patients are showing steady progress. The average adherence rate is improving week over week."
-                            : "Great work on your exercises! Keep maintaining your current routine and focus on proper form. Your consistency is key to recovery.";
-                    }
+                    aiResponseText = "I'm analyzing the data. Based on the current trends, progress is consistent with the recovery roadmap.";
                 }
 
                 const aiMsg = {
@@ -92,14 +88,6 @@ const NeuralChatModal = ({ isOpen, onClose, chatPartnerId = null, chatPartnerNam
             }
         } catch (error) {
             console.error('[NeuralChat] Failed to send message:', error);
-            // Show error message to user
-            const errorMsg = {
-                id: Date.now() + 1,
-                text: "Sorry, I encountered an error. Please try again.",
-                sender: 'ai',
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMsg]);
         } finally {
             setIsTyping(false);
         }
@@ -114,86 +102,87 @@ const NeuralChatModal = ({ isOpen, onClose, chatPartnerId = null, chatPartnerNam
     if (!isOpen) return null;
 
     const isOwnMessage = (msg) => {
-        return msg.senderId === user.uid || msg.sender === userData?.userType;
+        return msg.senderId === user.uid || (msg.sender && msg.sender !== 'ai');
     };
 
     const displayMessages = isAIChat ? [aiWelcomeMessage, ...messages] : messages;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-end md:p-10">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
-            />
-
-            {/* Sidebar Chat Modal */}
-            <div className="relative bg-white h-full md:h-[90vh] w-full md:w-[500px] md:rounded-[3rem] shadow-3xl overflow-hidden flex flex-col transform transition-all animate-in slide-in-from-right duration-500">
+        <div className="fixed bottom-6 right-6 z-[110] flex flex-col items-end gap-4">
+            <div className="relative w-[400px] h-[600px] bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
                 {/* Header */}
-                <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center border border-white/10 shadow-lg">
-                            {isAIChat ? <Sparkles className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
+                <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAIChat ? 'bg-blue-600' : 'bg-blue-600'}`}>
+                            {isAIChat ? <Bot className="w-6 h-6 text-white" /> : <MessageSquare className="w-6 h-6 text-white" />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-black leading-none mb-1">{isAIChat ? 'Neural Chat' : chatPartnerName}</h2>
-                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3" /> Encrypted Session
+                            <h2 className="text-lg font-black leading-none mb-1">{isAIChat ? 'Gati AI' : chatPartnerName}</h2>
+                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">
+                                {isAIChat ? 'Digital Assistant' : 'Patient Communication'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-3 hover:bg-white/10 rounded-2xl transition-colors"
+                        className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-400"
                         aria-label="Close chat"
                     >
-                        <X className="w-6 h-6 text-slate-400" />
+                        <X className="w-5 h-5 text-slate-400" />
                     </button>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 no-scrollbar">
                     {displayMessages.map((msg) => (
                         <div key={msg.id} className={`flex ${isOwnMessage(msg) ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`flex gap-3 max-w-[85%] ${isOwnMessage(msg) ? 'flex-row-reverse' : ''}`}>
-                                <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center ${isOwnMessage(msg) ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                                    {isOwnMessage(msg) ? <User className="w-4 h-4 text-white" /> : (isAIChat ? <Bot className="w-4 h-4 text-slate-500" /> : <User className="w-4 h-4 text-slate-500" />)}
-                                </div>
-                                <div className={`p-4 rounded-[1.5rem] shadow-sm text-sm font-bold leading-relaxed ${isOwnMessage(msg)
-                                    ? 'bg-blue-600 text-white rounded-tr-none'
-                                    : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
-                                    }`}>
+                            <div className={`max-w-[85%] px-4 py-3 rounded-[1.5rem] text-sm font-bold shadow-sm ${isOwnMessage(msg)
+                                ? 'bg-blue-600 text-white rounded-tr-none'
+                                : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
+                                }`}>
+                                <p className="whitespace-pre-wrap leading-relaxed">
                                     {msg.text}
-                                    <p className={`text-[9px] mt-2 opacity-60 ${isOwnMessage(msg) ? 'text-right' : ''}`}>
-                                        {formatTime(msg.timestamp)}
-                                    </p>
-                                </div>
+                                </p>
+                                <p className={`text-[8px] mt-1 opacity-60 ${isOwnMessage(msg) ? 'text-right' : ''}`}>
+                                    {formatTime(msg.timestamp)}
+                                </p>
                             </div>
                         </div>
                     ))}
+                    {isTyping && (
+                        <div className="flex justify-start">
+                            <div className="bg-white border border-slate-100 rounded-[1.5rem] rounded-tl-none px-4 py-3 flex items-center gap-2 shadow-sm">
+                                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                                <span className="text-xs text-slate-500 font-bold">Gati is thinking...</span>
+                            </div>
+                        </div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input */}
-                <div className="p-8 bg-white border-t border-slate-100">
+                <div className="p-6 bg-white border-t border-slate-100">
                     <form onSubmit={handleSend} className="relative">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder={isAIChat ? "Ask about recovery..." : "Type a message..."}
-                            className="w-full pl-6 pr-16 py-5 bg-slate-100 border-none rounded-[2rem] text-sm font-black focus:ring-4 focus:ring-blue-100 transition-all"
+                            className="w-full pl-6 pr-14 py-4 bg-slate-100 border-none rounded-2xl text-sm font-black focus:ring-4 focus:ring-blue-100 transition-all outline-none"
                         />
                         <button
                             type="submit"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 transition-all active:scale-95"
+                            disabled={!input.trim() || isTyping}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-200 text-white rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-blue-200"
                         >
                             <Send className="w-5 h-5" />
                         </button>
                     </form>
-                    <p className="text-[10px] text-center text-slate-400 font-bold mt-4 uppercase tracking-widest">
-                        {isAIChat ? 'Gati AI may occasionally provide inaccurate clinical insights.' : 'Direct messaging with clinical encryption.'}
-                    </p>
+                    {isAIChat && (
+                        <p className="text-[9px] text-center text-slate-400 font-bold mt-4 uppercase tracking-widest leading-tight">
+                            ⚠️ I am an AI assistant, not a doctor. Consult a professional for clinical advice.
+                        </p>
+                    )}
                 </div>
             </div>
         </div>

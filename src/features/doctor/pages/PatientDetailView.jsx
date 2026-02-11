@@ -1,12 +1,9 @@
 // PatientDetailView - Detailed view of patient progress with charts
 // Owner: Member 5
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
 import { ArrowLeft, User, Calendar, Activity, Mail, Phone, TrendingUp, ClipboardList, X, Download, MessageSquare } from 'lucide-react';
-const PatientROMProgressChart = lazy(() => import('../components/charts/PatientROMProgressChart'));
-const PatientQualityTrendChart = lazy(() => import('../components/charts/PatientQualityTrendChart'));
 import NavHeader from '../../../shared/components/NavHeader';
 import Footer from '../../../shared/components/Footer';
 import SessionReport from '../../patient/components/SessionReport';
@@ -16,11 +13,16 @@ import { getPatientDetails, getPatientSessions } from '../services/doctorService
 import { exportToCSV } from '../../../shared/utils/csvExport';
 import { useAuth } from '../../auth/context/AuthContext';
 import { logAction } from '../../../shared/utils/auditLogger';
+import { useTheme } from '../../../contexts/ThemeContext';
+
+const PatientROMProgressChart = lazy(() => import('../components/charts/PatientROMProgressChart'));
+const PatientQualityTrendChart = lazy(() => import('../components/charts/PatientQualityTrendChart'));
 
 const PatientDetailView = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const { user, userData } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   // State management
   const [patient, setPatient] = useState(null);
@@ -141,8 +143,13 @@ const PatientDetailView = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavHeader userType="doctor" doctorProfile={doctorProfile} />
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
+      <NavHeader
+        userType="doctor"
+        doctorProfile={doctorProfile}
+        theme={isDarkMode ? 'dark' : 'light'}
+        onThemeToggle={toggleTheme}
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header Actions Row */}
@@ -183,7 +190,7 @@ const PatientDetailView = () => {
         </div>
 
         {/* Patient Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className={`rounded-2xl shadow-sm border p-6 mb-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-col lg:flex-row items-start justify-between gap-6">
             <div className="flex items-start gap-4 flex-1">
               <div className="w-20 h-20 bg-blue-100 rounded-2xl flex items-center justify-center">
@@ -244,21 +251,21 @@ const PatientDetailView = () => {
         {sessions.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Range of Motion Trend */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 Range of Motion Progress
               </h2>
-              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading ROM...</div>}>
+              <Suspense fallback={<div className={`h-[300px] flex items-center justify-center rounded-xl animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>Loading ROM...</div>}>
                 <PatientROMProgressChart data={chartData.rom} />
               </Suspense>
             </div>
 
             {/* Quality Score Trend */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 Session Quality Trend
               </h2>
-              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading Quality...</div>}>
+              <Suspense fallback={<div className={`h-[300px] flex items-center justify-center rounded-xl animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>Loading Quality...</div>}>
                 <PatientQualityTrendChart data={chartData.quality} />
               </Suspense>
             </div>
@@ -272,8 +279,8 @@ const PatientDetailView = () => {
         )}
 
         {/* Recent Sessions */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+        <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Recent Sessions
           </h2>
           {sessions.length > 0 ? (
