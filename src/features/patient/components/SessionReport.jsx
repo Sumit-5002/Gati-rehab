@@ -60,7 +60,9 @@ const SessionReport = memo(({ sessionData }) => {
         <ReportStat
           icon={<Timer className="w-4 h-4" />}
           label="Duration"
-          value={duration}
+          value={typeof duration === 'number'
+            ? `${Math.round(duration / 60)} min`
+            : (duration || 'N/A')}
           color="orange"
         />
       </div>

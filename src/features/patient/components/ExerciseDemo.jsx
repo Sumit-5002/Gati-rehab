@@ -257,6 +257,17 @@ const calculateKinematics = (cx, by, phase, cycle, id = '', t) => {
         sk.elbowR = { x: cx + (35 + raise) * 1.1, y: offsetBy - (270 + raise * 0.1) * 1.05 };
         sk.handL = { x: cx - (35 + raise * 1.5) * 1.1, y: offsetBy - (270 + raise * 0.2) * 1.05 };
         sk.handR = { x: cx + (35 + raise * 1.5) * 1.1, y: offsetBy - (270 + raise * 0.2) * 1.05 };
+    } else if (lid.includes('laterallegraise')) {
+        const raise = phase * 70 * scale;
+        const ang = -phase * Math.PI / 6; // Side abduction angle
+        sk.kneeR = {
+            x: sk.hipR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
+            y: sk.hipR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
+        };
+        sk.ankleR = {
+            x: sk.kneeR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
+            y: sk.kneeR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
+        };
     } else if (lid.includes('legraise')) {
         const rot = -phase * Math.PI / 3;
         sk.kneeR = { x: sk.hipR.x + Math.sin(rot) * 90 * scale, y: sk.hipR.y + Math.cos(rot) * 90 * scale };
@@ -282,17 +293,6 @@ const calculateKinematics = (cx, by, phase, cycle, id = '', t) => {
         sk.kneeR.x += bend * 0.3;
         sk.ankleR.y -= bend;
         sk.ankleR.x += bend * 0.3;
-    } else if (lid.includes('laterallegraise')) {
-        const raise = phase * 70 * scale;
-        const ang = -phase * Math.PI / 6; // Side abduction angle
-        sk.kneeR = {
-            x: sk.hipR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
-            y: sk.hipR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
-        };
-        sk.ankleR = {
-            x: sk.kneeR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
-            y: sk.kneeR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
-        };
     } else if (lid.includes('armcircle')) {
         const rad = 25 * scale;
         const speed = t * Math.PI * 6; // Fast circles

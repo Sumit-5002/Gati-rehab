@@ -200,10 +200,12 @@ const WorkoutSession = () => {
   const handleEndSession = async () => {
     setSessionActive(false);
     const finalQuality = calculateFormQualityScore(frameDataRef.current, currentExercise);
+    const finalROM = trackRangeOfMotion(frameDataRef.current, currentExercise);
     const sessionData = {
       exerciseName: currentExercise,
       reps: repCount,
       quality: finalQuality.overallScore,
+      rangeOfMotion: finalROM?.rangeOfMotion || 0,
       duration: formatTime(elapsedTime),
       durationSeconds: elapsedTime,
       grade: finalQuality.grade
