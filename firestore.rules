@@ -49,10 +49,28 @@ service cloud.firestore {
       );
     }
     
+    function isNotChangingType() {
+      return resource == null || (
+        request.resource.data.userType == resource.data.userType &&
+        (!('role' in resource.data) || request.resource.data.role == resource.data.role)
+      );
+    }
+
     // 1. Users collection 
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || isDoctor() || isAdmin();
+      // Allow read if owner, doctor, admin, or patient of the user (if user is doctor)
+      // Doctors need to be able to find patients by email, so they can read all docs
+      allow read: if isOwner(userId) || isDoctor() || isAdmin() || isPatientOf(userId);
+
+      // Allow create if owner (signup) or doctor/admin (adding patient)
+      allow create: if isOwner(userId) || isDoctor() || isAdmin();
+
+      // Allow update if owner (but not changing type), doctor (if patient is unassigned or assigned to them), or admin
+      allow update: if (isOwner(userId) && isNotChangingType()) ||
+                     (isDoctor() && resource.data.userType == 'patient' && (resource.data.doctorId == request.auth.uid || resource.data.doctorId == null)) ||
+                     isAdmin();
+
+      allow delete: if isAdmin();
     }
     
     // 2. Routines Collection
@@ -171,7 +189,12 @@ service cloud.firestore {
 
     // 12. Notifications collection
     match /notifications/{notificationId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.recipientId == request.auth.uid ||
+        isDoctorOf(request.resource.data.recipientId) ||
+        isPatientOf(request.resource.data.recipientId) ||
+        isAdmin()
+      );
       allow read, update, delete: if isDocOwner(resource.data) || isAdmin();
     }
   }
