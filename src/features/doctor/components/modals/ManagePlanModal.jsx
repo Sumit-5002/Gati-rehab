@@ -8,7 +8,7 @@ import {
   deleteMedication
 } from '../../services/doctorService';
 import { AVAILABLE_EXERCISES } from '../../../ai/utils/secondaryExercises';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '../../../../contexts/ThemeContext';
 
 const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
   const { isDarkMode } = useTheme();
