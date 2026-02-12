@@ -67,6 +67,7 @@ const DoctorDashboard = () => {
   const [stats, setStats] = useState({
     totalPatients: 0,
     averageAdherence: 0,
+    averageQuality: 0,
     needsAttention: 0,
   });
 
@@ -130,23 +131,7 @@ const DoctorDashboard = () => {
       } finally {
         setInsightsLoading(false);
       }
-
-      // 2. Pass the fresh data to charts immediately (Fixes Point 2 & 3)
-      // This prevents re-fetching the patients inside the chart functions
-      try {
-        setChartsLoading(true);
-        const [adherence, quality, rom] = await Promise.all([
-          getAdherenceTrendData(user.uid, updatedPatients),
-          getFormQualityTrendData(user.uid, updatedPatients),
-          getROMTrendData(),
-        ]);
-        setChartData({ adherenceTrend: adherence, formQualityTrend: quality, romTrend: rom });
-      } catch (err) {
-        console.error('Error fetching charts:', err);
-      } finally {
-        setChartsLoading(false);
-        setLoading(false);
-      }
+      setLoading(false);
     });
 
     // 3. Listen for appointments
@@ -181,29 +166,61 @@ const DoctorDashboard = () => {
     if (patients.length > 0) {
       const total = patients.length;
 
-      // Calculate average adherence with fallback to completed/total ratio
       const adherenceValues = patients.map(p => {
-        // Use adherenceRate if available, otherwise calculate from sessions
-        if (p.adherenceRate && p.adherenceRate > 0) {
-          return p.adherenceRate;
-        }
-        // Fallback: calculate from completed vs total sessions
+        // Use adherenceRate if explicitly set, otherwise calculate
         const completed = p.completedSessions || 0;
-        const totalSessions = p.totalSessions || 5; // Default weekly goal
-        return Math.min(100, Math.round((completed / totalSessions) * 100));
+        const totalSessions = p.totalSessions || 5;
+        const calculatedRate = Math.min(100, Math.round((completed / totalSessions) * 100));
+
+        return Math.max(p.adherenceRate || 0, calculatedRate);
       });
 
       const avg = Math.round(adherenceValues.reduce((sum, val) => sum + val, 0) / total) || 0;
-      const urgent = patients.filter((p) => {
-        const rate = p.adherenceRate || (p.completedSessions / (p.totalSessions || 5)) * 100;
-        return rate < 60;
-      }).length;
 
-      setStats({ totalPatients: total, averageAdherence: avg, needsAttention: urgent });
+      // Calculate real average quality from patients' last session quality
+      const qualityValues = patients.map(p => p.lastSessionQuality || 0).filter(q => q > 0);
+      const avgQual = qualityValues.length > 0
+        ? Math.round(qualityValues.reduce((sum, val) => sum + val, 0) / qualityValues.length)
+        : 0;
+
+      const urgent = patients.filter((p, i) => adherenceValues[i] < 60).length;
+
+      setStats({
+        totalPatients: total,
+        averageAdherence: avg,
+        averageQuality: avgQual,
+        needsAttention: urgent
+      });
     } else {
       setStats({ totalPatients: 0, averageAdherence: 0, needsAttention: 0 });
     }
   }, [patients]);
+
+  // Separate effect for charts to handle timeframe changes
+  useEffect(() => {
+    const updateCharts = async () => {
+      if (!user || patients.length === 0) {
+        setChartsLoading(false);
+        return;
+      }
+
+      try {
+        setChartsLoading(true);
+        const [adherence, quality, rom] = await Promise.all([
+          getAdherenceTrendData(user.uid, patients, timeframe),
+          getFormQualityTrendData(user.uid, patients, timeframe),
+          getROMTrendData(user.uid, patients, timeframe),
+        ]);
+        setChartData({ adherenceTrend: adherence, formQualityTrend: quality, romTrend: rom });
+      } catch (err) {
+        console.error('Error fetching charts:', err);
+      } finally {
+        setChartsLoading(false);
+      }
+    };
+
+    updateCharts();
+  }, [user, patients, timeframe]);
 
   const filteredPatients = patients.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -238,18 +255,18 @@ const DoctorDashboard = () => {
         {/* Modern Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div className="space-y-2">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
+            <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-none ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Clinic <span className="text-blue-600">Overview</span>
             </h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-white">
+          <div className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-4 p-2 rounded-[2rem] shadow-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-white shadow-slate-200/50'}`}>
             <div className="relative group flex-1 sm:flex-none">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
                 placeholder="Search patients..."
-                className="pl-12 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-base w-full sm:w-80 font-bold focus:ring-4 focus:ring-blue-100 transition-all"
+                className={`pl-12 pr-6 py-4 border-none rounded-2xl text-base w-full sm:w-80 font-bold focus:ring-4 focus:ring-blue-100 transition-all ${isDarkMode ? 'bg-gray-700 text-white placeholder-slate-500' : 'bg-slate-50 text-slate-900'}`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -272,6 +289,7 @@ const DoctorDashboard = () => {
             color="blue"
             trend="+2 this week"
             description="Active recovery plans"
+            isDarkMode={isDarkMode}
           />
           <DetailStatCard
             title="Avg. Adherence"
@@ -280,14 +298,16 @@ const DoctorDashboard = () => {
             color="emerald"
             trend="Stable"
             description="Cross-patient average"
+            isDarkMode={isDarkMode}
           />
           <DetailStatCard
             title="Avg. Quality"
-            value="84%"
+            value={`${stats.averageQuality}%`}
             icon={<Activity className="w-6 h-6" />}
             color="indigo"
-            trend="+5%"
+            trend={stats.averageQuality > 80 ? 'Optimal' : 'Checking'}
             description="Exercise execution"
+            isDarkMode={isDarkMode}
           />
           <DetailStatCard
             title="High Risks"
@@ -297,6 +317,7 @@ const DoctorDashboard = () => {
             trend="Needs Review"
             isAlert={stats.needsAttention > 0}
             description="Below 60% adherence"
+            isDarkMode={isDarkMode}
           />
         </div>
 
@@ -304,21 +325,21 @@ const DoctorDashboard = () => {
           {/* Main Content Area */}
           <div className="lg:col-span-8 space-y-8">
             {/* Charts Section */}
-            <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-50">
+            <div className={`p-6 sm:p-8 rounded-[2rem] shadow-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-slate-50 shadow-slate-200/50'}`}>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">Clinical Analytics</h3>
+                  <h3 className={`text-xl sm:text-2xl font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Clinical Analytics</h3>
                 </div>
-                <div className="flex p-1.5 bg-slate-100 rounded-2xl w-full sm:w-auto">
+                <div className={`flex p-1.5 rounded-2xl w-full sm:w-auto ${isDarkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                   <button
                     onClick={() => setTimeframe('weekly')}
-                    className={`px-4 py-2 text-sm font-black rounded-xl flex-1 sm:flex-none transition-all ${timeframe === 'weekly' ? 'bg-white shadow-lg text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-4 py-2 text-sm font-black rounded-xl flex-1 sm:flex-none transition-all ${timeframe === 'weekly' ? (isDarkMode ? 'bg-gray-600 shadow-lg text-blue-400' : 'bg-white shadow-lg text-blue-600') : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     Weekly
                   </button>
                   <button
                     onClick={() => setTimeframe('monthly')}
-                    className={`px-4 py-2 text-sm font-black rounded-xl flex-1 sm:flex-none transition-all ${timeframe === 'monthly' ? 'bg-white shadow-lg text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-4 py-2 text-sm font-black rounded-xl flex-1 sm:flex-none transition-all ${timeframe === 'monthly' ? (isDarkMode ? 'bg-gray-600 shadow-lg text-blue-400' : 'bg-white shadow-lg text-blue-600') : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     Monthly
                   </button>
@@ -327,30 +348,30 @@ const DoctorDashboard = () => {
               <Suspense fallback={<div className="h-64 flex items-center justify-center bg-slate-50 rounded-2xl animate-pulse text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Analytics...</div>}>
                 <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-4">
-                    <AdherenceTrendChart data={chartData.adherenceTrend} loading={chartsLoading} timeframe={timeframe} />
+                    <AdherenceTrendChart data={chartData.adherenceTrend} loading={chartsLoading} timeframe={timeframe} isDarkMode={isDarkMode} />
                   </div>
                   <div className="space-y-4">
-                    <FormQualityChart data={chartData.formQualityTrend} loading={chartsLoading} timeframe={timeframe} />
+                    <FormQualityChart data={chartData.formQualityTrend} loading={chartsLoading} timeframe={timeframe} isDarkMode={isDarkMode} />
                   </div>
                 </div>
               </Suspense>
             </div>
 
-            <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-50">
-              <Suspense fallback={<div className="h-64 flex items-center justify-center bg-slate-50 rounded-2xl animate-pulse text-slate-400 font-bold uppercase text-xs tracking-widest">Loading Biometrics...</div>}>
-                <ROMTrendChart data={chartData.romTrend} loading={chartsLoading} timeframe={timeframe} />
+            <div className={`p-6 sm:p-8 rounded-[2rem] shadow-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-slate-50 shadow-slate-200/50'}`}>
+              <Suspense fallback={<div className={`h-64 flex items-center justify-center rounded-2xl animate-pulse font-bold uppercase text-xs tracking-widest ${isDarkMode ? 'bg-gray-700 text-slate-500' : 'bg-slate-50 text-slate-400'}`}>Loading Biometrics...</div>}>
+                <ROMTrendChart data={chartData.romTrend} loading={chartsLoading} timeframe={timeframe} isDarkMode={isDarkMode} />
               </Suspense>
             </div>
 
             {/* Patient List Section */}
-            <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-50">
+            <div className={`p-6 sm:p-8 rounded-[2rem] shadow-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-slate-50 shadow-slate-200/50'}`}>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">Patient Directory</h3>
+                  <h3 className={`text-xl sm:text-2xl font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Patient Directory</h3>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
                   <select
-                    className="bg-slate-50 border-none rounded-xl text-sm font-bold py-2.5 px-4 text-slate-600 focus:ring-4 focus:ring-blue-100 w-full sm:w-auto"
+                    className={`border-none rounded-xl text-sm font-bold py-2.5 px-4 focus:ring-4 focus:ring-blue-100 w-full sm:w-auto transition-all ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-slate-50 text-slate-600'}`}
                     value={filterAdherence}
                     onChange={(e) => setFilterAdherence(e.target.value)}
                   >
@@ -359,11 +380,11 @@ const DoctorDashboard = () => {
                     <option value="medium">Medium (60-80%)</option>
                     <option value="low">Low (60%-)</option>
                   </select>
-                  <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full sm:w-auto">
-                    <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'} flex-1 sm:flex-none`}>
+                  <div className={`flex p-1.5 rounded-2xl w-full sm:w-auto ${isDarkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                    <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? (isDarkMode ? 'bg-gray-600 shadow-md text-blue-400' : 'bg-white shadow-md text-blue-600') : 'text-slate-400 hover:text-slate-200'} flex-1 sm:flex-none`}>
                       <LayoutGrid className="w-5 h-5" />
                     </button>
-                    <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'} flex-1 sm:flex-none`}>
+                    <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? (isDarkMode ? 'bg-gray-600 shadow-md text-blue-400' : 'bg-white shadow-md text-blue-600') : 'text-slate-400 hover:text-slate-200'} flex-1 sm:flex-none`}>
                       <List className="w-5 h-5" />
                     </button>
                   </div>
@@ -375,9 +396,9 @@ const DoctorDashboard = () => {
                   <PatientCard key={p.id} patient={p} viewMode={viewMode} />
                 ))}
                 {filteredPatients.length === 0 && (
-                  <div className="py-16 text-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
-                    <Users className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                    <p className="text-slate-500 text-lg font-black">No matching patients discovered.</p>
+                  <div className={`py-16 text-center rounded-[2rem] border-2 border-dashed transition-all ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-slate-50 border-slate-200'}`}>
+                    <Users className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-slate-200'}`} />
+                    <p className={`text-lg font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>No matching patients discovered.</p>
                     <p className="text-slate-400 mt-2 font-bold">Try adjusting your filters or search term.</p>
                   </div>
                 )}
@@ -440,9 +461,9 @@ const DoctorDashboard = () => {
             </div>
 
             {/* Upcoming Appointments */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-50">
+            <div className={`p-6 rounded-[2rem] shadow-xl border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-slate-50 shadow-slate-200/50'}`}>
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-black text-slate-900">Next Sessions</h3>
+                <h3 className={`text-lg font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Next Sessions</h3>
                 <Calendar className="w-5 h-5 text-slate-400" />
               </div>
               <div className="space-y-3">
@@ -453,6 +474,7 @@ const DoctorDashboard = () => {
                     time={`${app.date} ${app.time}`}
                     type={app.type}
                     status={app.status}
+                    isDarkMode={isDarkMode}
                     onJoin={app.status === 'confirmed' && app.type === 'Video Call' ? () => {
                       setSelectedRoom(`Gati_Session_${app.id}`);
                       setVideoOpen(true);
@@ -465,7 +487,7 @@ const DoctorDashboard = () => {
               </div>
               <button
                 onClick={() => setAppointmentOpen(true)}
-                className="w-full mt-6 py-3 bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors rounded-xl font-bold flex items-center justify-center gap-2"
+                className={`w-full mt-6 py-3 transition-colors rounded-xl font-bold flex items-center justify-center gap-2 ${isDarkMode ? 'bg-gray-700 text-slate-400 hover:text-blue-400' : 'bg-slate-50 text-slate-400 hover:text-blue-600'}`}
               >
                 Open Calendar <ChevronRight className="w-4 h-4" />
               </button>
@@ -522,17 +544,17 @@ const DoctorDashboard = () => {
   );
 };
 
-const AppointmentRow = ({ name, time, type, status, onJoin }) => (
-  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all cursor-pointer group">
+const AppointmentRow = ({ name, time, type, status, onJoin, isDarkMode }) => (
+  <div className={`flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer group ${isDarkMode ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-slate-50 hover:bg-slate-100'}`}>
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <Users className="w-5 h-5 text-slate-400" />
       </div>
       <div>
-        <p className="text-sm font-black text-slate-800">{name}</p>
+        <p className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{name}</p>
         <div className="flex items-center gap-2">
           <p className="text-[10px] font-bold text-slate-400 uppercase">{type}</p>
-          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
+          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${status === 'confirmed' ? (isDarkMode ? 'bg-emerald-900/20 text-emerald-400 border-emerald-900/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100') : (isDarkMode ? 'bg-gray-800 text-slate-500 border-gray-700' : 'bg-slate-100 text-slate-400')}`}>
             {status}
           </span>
         </div>
@@ -552,7 +574,7 @@ const AppointmentRow = ({ name, time, type, status, onJoin }) => (
   </div>
 );
 
-const DetailStatCard = ({ title, value, icon, color, trend, isAlert, description }) => {
+const DetailStatCard = ({ title, value, icon, color, trend, isAlert, description, isDarkMode }) => {
   const colorClasses = {
     blue: 'from-blue-600 to-blue-700 shadow-blue-200',
     emerald: 'from-emerald-600 to-emerald-700 shadow-emerald-200',
@@ -561,27 +583,27 @@ const DetailStatCard = ({ title, value, icon, color, trend, isAlert, description
   };
 
   const bgLight = {
-    blue: 'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    rose: 'bg-rose-50 text-rose-600',
-    indigo: 'bg-indigo-50 text-indigo-600'
+    blue: isDarkMode ? 'bg-blue-900/20 text-blue-400' : 'bg-blue-50 text-blue-600',
+    emerald: isDarkMode ? 'bg-emerald-900/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600',
+    rose: isDarkMode ? 'bg-rose-900/20 text-rose-400' : 'bg-rose-50 text-rose-600',
+    indigo: isDarkMode ? 'bg-indigo-900/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600'
   };
 
   return (
-    <div className={`group relative overflow-hidden bg-white p-8 rounded-[3rem] border border-slate-50 shadow-xl shadow-slate-200/50 transition-all hover:shadow-2xl hover:-translate-y-1 ${isAlert ? 'ring-4 ring-rose-100' : ''}`}>
+    <div className={`group relative overflow-hidden p-8 rounded-[3rem] border transition-all hover:-translate-y-1 ${isDarkMode ? 'bg-gray-800 border-gray-700 shadow-none' : 'bg-white border-slate-50 shadow-xl shadow-slate-200/50 hover:shadow-2xl'} ${isAlert ? (isDarkMode ? 'ring-4 ring-rose-900/30' : 'ring-4 ring-rose-100') : ''}`}>
       <div className="relative z-10 flex flex-col h-full">
         <div className="flex items-center justify-between mb-8">
           <div className={`p-4 rounded-2xl shadow-lg transition-transform group-hover:scale-110 ${bgLight[color]}`}>
             {icon}
           </div>
-          <div className={`text-[10px] font-black px-3 py-1.5 rounded-full ${color === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
+          <div className={`text-[10px] font-black px-3 py-1.5 rounded-full ${color === 'rose' ? (isDarkMode ? 'bg-rose-900/40 text-rose-400' : 'bg-rose-100 text-rose-600') : (isDarkMode ? 'bg-gray-700 text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
             {trend}
           </div>
         </div>
 
         <div className="mt-auto">
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-          <h4 className="text-4xl font-black text-slate-900 leading-none mb-3">{value}</h4>
+          <h4 className={`text-4xl font-black leading-none mb-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{value}</h4>
           <p className="text-xs font-bold text-slate-400">{description}</p>
         </div>
       </div>

@@ -60,12 +60,16 @@ export const getPatientStats = async (patientId) => {
     const patientSnap = await getDoc(patientRef);
     const patientData = patientSnap.exists() ? patientSnap.data() : {};
 
+    const completedSessions = patientData.completedSessions || 0;
+    const weeklyGoal = patientData.weeklyGoal || 5;
+    const calculatedRate = Math.min(100, Math.round((completedSessions / weeklyGoal) * 100));
+
     return {
-      totalSessions: patientData.completedSessions || 0,
-      weeklyGoal: patientData.weeklyGoal || 5,
+      totalSessions: completedSessions,
+      weeklyGoal: weeklyGoal,
       completed: weeklyCompleted,
       streak: patientData.streak || 0,
-      adherenceRate: patientData.adherenceRate || 0,
+      adherenceRate: patientData.adherenceRate !== undefined ? patientData.adherenceRate : calculatedRate,
     };
   } catch (error) {
     console.error('[PatientService] Get stats error:', error);
@@ -305,33 +309,39 @@ export const getTrendData = async (patientId) => {
     };
 
     // 3. Fallback: If no trend data exists, compute from last 7 sessions
-    if (result.romData.length === 0 || result.qualityData.length === 0) {
+    if (!result.romData || result.romData.length === 0 || !result.qualityData || result.qualityData.length === 0) {
       const sessionsRef = collection(db, 'sessions');
+      // Fix: Removing orderBy to avoid composite index requirement
+      // We will sort client-side instead
       const q = query(
         sessionsRef,
         where('patientId', '==', patientId),
-        orderBy('date', 'asc'),
-        limit(7)
+        limit(20) // Get more to ensure we have enough after sorting
       );
+
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
-        const sessionMeds = snapshot.docs.map(doc => {
-          const data = doc.data();
-          const d = data.date?.toDate ? data.date.toDate() : new Date(data.date);
-          return {
-            day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-            rom: data.rangeOfMotion || 0,
-            quality: data.quality || 0,
-            timestamp: d.getTime()
-          };
-        });
+        // Process and sort sessions client-side
+        const processedSessions = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const d = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+            return {
+              day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+              rom: data.rangeOfMotion || 0,
+              quality: data.quality || 0,
+              timestamp: d.getTime()
+            };
+          })
+          .sort((a, b) => a.timestamp - b.timestamp) // Sort oldest to newest
+          .slice(-7); // Take last 7 days
 
-        if (result.romData.length === 0) {
-          result.romData = sessionMeds.map(s => ({ day: s.day, value: s.rom }));
+        if (!result.romData || result.romData.length === 0) {
+          result.romData = processedSessions.map(s => ({ day: s.day, value: s.rom }));
         }
-        if (result.qualityData.length === 0) {
-          result.qualityData = sessionMeds.map(s => ({ day: s.day, value: s.quality }));
+        if (!result.qualityData || result.qualityData.length === 0) {
+          result.qualityData = processedSessions.map(s => ({ day: s.day, value: s.quality }));
         }
       }
     }
@@ -339,6 +349,7 @@ export const getTrendData = async (patientId) => {
     return result;
   } catch (error) {
     console.error('[PatientService] Get trend data error:', error);
+    // Return empty arrays on error so UI doesn't break
     return {
       romData: [],
       qualityData: [],

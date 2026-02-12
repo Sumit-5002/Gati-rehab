@@ -7,6 +7,7 @@ import Webcam from 'react-webcam';
 import { Camera, Video, VideoOff, AlertCircle } from 'lucide-react';
 import { calculateAngles } from '../utils/angleCalculations';
 import { generateRealTimeFeedback, playAudioCue, speakFeedback } from '../utils/realTimeFeedback';
+import { AVAILABLE_EXERCISES } from '../utils/secondaryExercises';
 
 // Separate FPS counter component to minimize re-renders
 const FPSDisplay = memo(({ fps }) => (
@@ -15,7 +16,7 @@ const FPSDisplay = memo(({ fps }) => (
   </span>
 ));
 
-const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount, settings = {} }) => {
+const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, onStatusChange, repCount, settings = {} }) => {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -65,10 +66,12 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
         });
 
         setIsModelLoaded(true);
+        if (onStatusChange) onStatusChange({ isLoaded: true, error: null });
         console.log('[AIEngine] MediaPipe Pose model loaded successfully');
       } catch (err) {
         console.error('[AIEngine] Error loading model:', err);
         setError('Failed to load AI model. Please refresh the page.');
+        if (onStatusChange) onStatusChange({ isLoaded: false, error: 'Failed to load AI model' });
       }
     };
 
@@ -270,15 +273,6 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
       });
       ctx.fill();
     }
-
-    // Draw visibility indicators separately to avoid fillStyle switching in loop
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '10px Arial';
-    keypoints.forEach((keypoint, index) => {
-      if (keypoint.visibility > 0.5) {
-        ctx.fillText(index, keypoint.x * width + 8, keypoint.y * height - 8);
-      }
-    });
   };
 
   const toggleCamera = () => {
@@ -372,8 +366,8 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
       {/* Exercise Info */}
       {exerciseType && (
         <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <p className="text-xs sm:text-sm font-medium text-blue-100">
-            Current Exercise: <span className="font-bold">{exerciseType}</span>
+          <p className="text-xs sm:text-sm font-medium text-blue-100 uppercase tracking-widest">
+            Exercise: <span className="font-black text-white">{AVAILABLE_EXERCISES[exerciseType]?.name || String(exerciseType).replace(/-/g, ' ')}</span>
           </p>
         </div>
       )}

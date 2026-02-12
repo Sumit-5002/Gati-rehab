@@ -120,7 +120,7 @@ export const getSessionReportsByExercise = (exerciseType) => {
   try {
     const reports = getSessionReports();
     return reports.filter(
-      report => report.exerciseType?.toLowerCase() === exerciseType.toLowerCase()
+      report => String(report.exerciseType || '').toLowerCase() === String(exerciseType || '').toLowerCase()
     );
   } catch (error) {
     console.error('[sessionReportWriter] Error filtering by exercise:', error);

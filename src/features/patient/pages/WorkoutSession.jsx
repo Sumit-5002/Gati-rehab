@@ -211,10 +211,12 @@ const WorkoutSession = () => {
   const handleEndSession = async () => {
     setSessionActive(false);
     const finalQuality = calculateFormQualityScore(frameDataRef.current, currentExercise);
+    const finalROM = trackRangeOfMotion(frameDataRef.current, currentExercise);
     const sessionData = {
-      exerciseName: currentExercise,
+      exerciseName: AVAILABLE_EXERCISES[currentExercise]?.name || String(currentExercise).replace(/-/g, ' '),
       reps: repCount,
       quality: finalQuality.overallScore,
+      rangeOfMotion: finalROM?.rangeOfMotion || 0,
       duration: formatTime(elapsedTime),
       durationSeconds: elapsedTime,
       grade: finalQuality.grade
@@ -401,7 +403,7 @@ const WorkoutSession = () => {
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-sm font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Anatomical Lab</h3>
-                    <p className="text-xl font-black text-white">{AVAILABLE_EXERCISES[currentExercise]?.name || 'Loading'}</p>
+                    <p className="text-xl font-black text-white">{AVAILABLE_EXERCISES[currentExercise]?.name || String(currentExercise).replace(/-/g, ' ')}</p>
                   </div>
                   <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center">
                     <Info className="w-5 h-5 text-blue-400" />

@@ -152,11 +152,17 @@ const updatePatientStats = async (userId, sessionData) => {
     }
 
     // Increment completed sessions and update streak
+    const currentCompleted = userData.completedSessions || 0;
+    const newCompletedSessions = currentCompleted + 1;
+    const weeklyGoal = userData.weeklyGoal || 5;
+    const newAdherenceRate = Math.min(100, Math.round((newCompletedSessions / weeklyGoal) * 100));
+
     await updateDoc(userRef, {
       completedSessions: increment(1),
       lastActive: serverTimestamp(),
       streak: newStreak,
-      lastSessionQuality: sessionData.quality || 0
+      lastSessionQuality: sessionData.quality || 0,
+      adherenceRate: newAdherenceRate
     });
 
     // Notify doctor

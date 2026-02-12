@@ -28,16 +28,24 @@ export const getDoctorPatients = async (doctorId) => {
 
     return snapshot.docs.map(doc => {
       const data = doc.data();
+      const completed = data.completedSessions || 0;
+      const total = data.totalSessions || 5;
+      const calculatedRate = Math.min(100, Math.round((completed / total) * 100));
+
+      // Use the higher of the two to ensure we show progress immediately
+      const effectiveAdherence = Math.max(data.adherenceRate || 0, calculatedRate);
+
       return {
         id: doc.id,
         name: data.name || 'Unknown',
         condition: data.condition || 'N/A',
-        adherenceRate: data.adherenceRate || 0,
-        completedSessions: data.completedSessions || 0,
-        totalSessions: data.totalSessions || 0,
+        adherenceRate: effectiveAdherence,
+        completedSessions: completed,
+        totalSessions: total,
         lastActive: formatLastActive(data.lastActive),
-        progressLevel: getProgressLevel(data.adherenceRate || 0),
-        email: data.email
+        progressLevel: getProgressLevel(effectiveAdherence),
+        email: data.email,
+        lastSessionQuality: data.lastSessionQuality || 0
       };
     });
   } catch (error) {
@@ -58,17 +66,23 @@ export const subscribeToDoctorPatients = (doctorId, callback) => {
     const patients = [];
     snapshot.forEach((doc) => {
       const data = doc.data();
+      const completed = data.completedSessions || 0;
+      const total = data.totalSessions || 5;
+      const calculatedRate = Math.min(100, Math.round((completed / total) * 100));
+      const effectiveAdherence = Math.max(data.adherenceRate || 0, calculatedRate);
+
       patients.push({
         id: doc.id,
         name: data.name || 'Unknown',
         condition: data.condition || 'N/A',
-        adherenceRate: data.adherenceRate || 0,
-        completedSessions: data.completedSessions || 0,
-        totalSessions: data.totalSessions || 0,
+        adherenceRate: effectiveAdherence,
+        completedSessions: completed,
+        totalSessions: total,
         lastActive: formatLastActive(data.lastActive),
-        progressLevel: getProgressLevel(data.adherenceRate || 0),
+        progressLevel: getProgressLevel(effectiveAdherence),
         injuryType: data.injuryType || 'General',
-        rehabPhase: data.rehabPhase || 'Assessment'
+        rehabPhase: data.rehabPhase || 'Assessment',
+        lastSessionQuality: data.lastSessionQuality || 0
       });
     });
 
@@ -234,16 +248,33 @@ export const getDoctorStats = async (doctorId) => {
 
 const formatLastActive = (timestamp) => {
   if (!timestamp) return 'Never';
+
+  // Handle Firestore server timestamp objects and pending writes
+  if (typeof timestamp === 'object' && !timestamp.toDate) {
+    if (timestamp.seconds) { // It's a timestamp but not a full object yet
+      const d = new Date(timestamp.seconds * 1000);
+      return formatTimeAgo(d);
+    }
+    return 'Just now';
+  }
+
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Just now';
+
+  return formatTimeAgo(date);
+};
+
+const formatTimeAgo = (date) => {
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
+  if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
   if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  if (diffDays === 1) return '1 day ago';
+  if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? 's' : ''} ago`;
 
@@ -251,65 +282,87 @@ const formatLastActive = (timestamp) => {
 };
 
 const getProgressLevel = (adherenceRate) => {
-  if (adherenceRate >= 90) return 'Excellent';
-  if (adherenceRate >= 80) return 'Good';
-  if (adherenceRate >= 70) return 'Fair';
-  if (adherenceRate >= 60) return 'Needs Improvement';
+  const rate = parseInt(adherenceRate) || 0;
+  if (rate >= 90) return 'Excellent';
+  if (rate >= 80) return 'Good';
+  if (rate >= 70) return 'Fair';
+  if (rate >= 60) return 'Needs Improvement';
   return 'Needs Attention';
 };
 
 /**
- * Get adherence trend data for charts (last 7 days)
- * FIX: Accepts 'existingPatients' to avoid re-fetching (Fixes Point 2)
+ * Get aggregated data for all patients to feed into charts
  */
-export const getAdherenceTrendData = async (doctorId, patients = null) => {
+const getClinicSessionData = async (patients, days = 7) => {
+  if (!patients || patients.length === 0) return [];
+
   try {
-    // FIX: Use passed patients if available, else fetch
-    if (!patients) {
-      patients = await getDoctorPatients(doctorId);
+    const allSessions = [];
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(startDate.getDate() - days);
+
+    // Fetch sessions for all patients in parallel
+    const sessionPromises = patients.map(async (p) => {
+      const q = query(
+        collection(db, 'sessions'),
+        where('patientId', '==', p.id),
+        where('date', '>=', startDate)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ ...doc.data(), patientId: p.id }));
+    });
+
+    const results = await Promise.all(sessionPromises);
+    results.forEach(patientSessions => allSessions.push(...patientSessions));
+
+    console.log(`[DoctorService] Aggregated ${allSessions.length} total sessions for ${patients.length} patients over ${days} days`);
+    return allSessions;
+  } catch (error) {
+    console.error('[DoctorService] Error fetching clinic session data:', error);
+    return [];
+  }
+};
+
+/**
+ * Get adherence trend data for charts (last 7 days)
+ */
+export const getAdherenceTrendData = async (doctorId, patients = null, timeframe = 'weekly') => {
+  try {
+    if (!patients) patients = await getDoctorPatients(doctorId);
+    if (patients.length === 0) return [];
+
+    const daysCount = timeframe === 'monthly' ? 30 : 7;
+    const sessions = await getClinicSessionData(patients, daysCount);
+
+    const trendDays = [];
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      trendDays.push(d);
     }
 
-    if (patients.length === 0) {
-      return [];
-    }
-
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      last7Days.push(date);
-    }
-
-    const trendData = last7Days.map((date, index) => {
+    return trendDays.map(date => {
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-      const avgAdherence = Math.round(
-        patients.reduce((sum, p) => {
-          // Use adherenceRate if available, otherwise calculate from sessions
-          let rate = 0;
-          if (p.adherenceRate && p.adherenceRate > 0) {
-            rate = p.adherenceRate;
-          } else {
-            const completed = p.completedSessions || 0;
-            const total = p.totalSessions || 5;
-            rate = Math.min(100, (completed / total) * 100);
-          }
-          return sum + rate;
-        }, 0) / patients.length
-      );
+      // Real adherence: % of patients who did at least one session on this specific day
+      const patientsWhoWorkedOut = new Set(
+        sessions
+          .filter(s => {
+            const sDate = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+            return sDate.setHours(0, 0, 0, 0) === date.getTime();
+          })
+          .map(s => s.patientId)
+      ).size;
 
-      // Introduce slight variation for a more realistic "trend" look
-      // (Variation decreases as we get closer to today)
-      const variation = (6 - index) * (Math.random() > 0.5 ? 1 : -1) * 2;
-      const displayAdherence = Math.max(0, Math.min(100, avgAdherence + variation));
+      const adherence = Math.round((patientsWhoWorkedOut / patients.length) * 100);
 
       return {
         date: dateStr,
-        adherence: Math.round(displayAdherence)
+        adherence: adherence || 0 // No variation, just truth
       };
     });
-
-    return trendData;
   } catch (error) {
     console.error('[DoctorService] Get adherence trend error:', error);
     return [];
@@ -318,26 +371,40 @@ export const getAdherenceTrendData = async (doctorId, patients = null) => {
 
 /**
  * Get form quality trend data for charts (last 7 days)
- * FIX: Accepts 'existingPatients' to avoid re-fetching (Fixes Point 2)
  */
-export const getFormQualityTrendData = async (doctorId, patients = null) => {
+export const getFormQualityTrendData = async (doctorId, patients = null, timeframe = 'weekly') => {
   try {
-    if (!patients) {
-      patients = await getDoctorPatients(doctorId);
-    }
+    if (!patients) patients = await getDoctorPatients(doctorId);
     if (patients.length === 0) return [];
 
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      last7Days.push(date);
+    const daysCount = timeframe === 'monthly' ? 30 : 7;
+    const sessions = await getClinicSessionData(patients, daysCount);
+
+    const trendDays = [];
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      trendDays.push(d);
     }
 
-    return last7Days.map(date => ({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      quality: Math.floor(Math.random() * 20) + 75
-    }));
+    return trendDays.map(date => {
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dailySessions = sessions.filter(s => {
+        const sDate = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+        const sTime = new Date(sDate).setHours(0, 0, 0, 0);
+        return sTime === date.getTime();
+      });
+
+      const avgQuality = dailySessions.length > 0
+        ? Math.round(dailySessions.reduce((sum, s) => sum + (s.quality || 0), 0) / dailySessions.length)
+        : 0;
+
+      return {
+        date: dateStr,
+        quality: avgQuality
+      };
+    });
   } catch (error) {
     console.error('[DoctorService] Get form quality trend error:', error);
     return [];
@@ -345,21 +412,64 @@ export const getFormQualityTrendData = async (doctorId, patients = null) => {
 };
 
 /**
- * Get ROM trend data for charts (last 4 weeks)
- * FIX: Accepts 'existingPatients' to avoid re-fetching (Fixes Point 2)
+ * Get ROM trend data for charts (last 4 weeks/days)
  */
-export const getROMTrendData = async () => {
+export const getROMTrendData = async (doctorId, patients = null, timeframe = 'weekly') => {
   try {
-    // Even if ROM data is mocked, we accept the args for consistency
-    const last4Weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    if (!patients) patients = await getDoctorPatients(doctorId);
+    if (patients.length === 0) return [];
 
-    return last4Weeks.map(week => ({
-      date: week,
-      knee: 110 + Math.floor(Math.random() * 20),
-      hip: 80 + Math.floor(Math.random() * 15),
-      shoulder: 140 + Math.floor(Math.random() * 25),
-      ankle: 30 + Math.floor(Math.random() * 10)
-    }));
+    const daysCount = timeframe === 'monthly' ? 30 : 7;
+    const sessions = await getClinicSessionData(patients, daysCount);
+
+    const trendDays = [];
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      trendDays.push(d);
+    }
+
+    // Joint Mapping
+    const jointMap = {
+      'knee-bends': 'knee',
+      'knee-bend': 'knee',
+      'squat': 'knee',
+      'squats': 'knee',
+      'leg-raises': 'hip',
+      'leg-raise': 'hip',
+      'hip-flexion': 'hip',
+      'standing-march': 'hip',
+      'shoulder-raises': 'shoulder',
+      'arm-raise': 'shoulder',
+      'arm-circles': 'shoulder',
+      'elbow-flexion': 'elbow',
+      'calf-raises': 'ankle'
+    };
+
+    return trendDays.map(date => {
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dailySessions = sessions.filter(s => {
+        const sDate = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+        const sTime = new Date(sDate).setHours(0, 0, 0, 0);
+        return sTime === date.getTime();
+      });
+
+      const getAvgROM = (joint) => {
+        const jointSessions = dailySessions.filter(s => jointMap[s.exerciseId || s.exerciseName?.toLowerCase()] === joint);
+        return jointSessions.length > 0
+          ? Math.round(jointSessions.reduce((sum, s) => sum + (s.rangeOfMotion || 0), 0) / jointSessions.length)
+          : 0;
+      };
+
+      return {
+        date: dateStr,
+        knee: getAvgROM('knee'),
+        hip: getAvgROM('hip'),
+        shoulder: getAvgROM('shoulder'),
+        ankle: getAvgROM('ankle')
+      };
+    });
   } catch (error) {
     console.error('[DoctorService] Get ROM trend error:', error);
     return [];
@@ -406,7 +516,7 @@ export const addPatientToDoctor = async (doctorId, patientData) => {
         createdAt: serverTimestamp(),
         adherenceRate: 0,
         completedSessions: 0,
-        totalSessions: 0,
+        totalSessions: 5,
         streak: 0,
         isInvite: true // Flag to indicate this is a placeholder
       });

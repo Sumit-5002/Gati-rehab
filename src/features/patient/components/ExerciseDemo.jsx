@@ -214,7 +214,7 @@ const drawPose = (ctx, w, h, frame, id) => {
 
 const calculateKinematics = (cx, by, phase, cycle, id = '', t) => {
     // Normalize ID for robust matching
-    const lid = id.toLowerCase().replace(/[-_ ]/g, '');
+    const lid = String(id || '').toLowerCase().replace(/[-_ ]/g, '');
 
     // Calibrated scale to ensure full head visibility and body fit
     const scale = 2.0;
@@ -262,6 +262,17 @@ const calculateKinematics = (cx, by, phase, cycle, id = '', t) => {
         sk.elbowR = { x: cx + (35 + raise) * 1.1, y: offsetBy - (270 + raise * 0.1) * 1.05 };
         sk.handL = { x: cx - (35 + raise * 1.5) * 1.1, y: offsetBy - (270 + raise * 0.2) * 1.05 };
         sk.handR = { x: cx + (35 + raise * 1.5) * 1.1, y: offsetBy - (270 + raise * 0.2) * 1.05 };
+    } else if (lid.includes('laterallegraise')) {
+        const raise = phase * 70 * scale;
+        const ang = -phase * Math.PI / 6; // Side abduction angle
+        sk.kneeR = {
+            x: sk.hipR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
+            y: sk.hipR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
+        };
+        sk.ankleR = {
+            x: sk.kneeR.x + Math.cos(ang + Math.PI / 2) * 90 * scale,
+            y: sk.kneeR.y + Math.sin(ang + Math.PI / 2) * 90 * scale
+        };
     } else if (lid.includes('legraise')) {
         const rot = -phase * Math.PI / 3;
         sk.kneeR = { x: sk.hipR.x + Math.sin(rot) * 90 * scale, y: sk.hipR.y + Math.cos(rot) * 90 * scale };
@@ -332,7 +343,7 @@ const calculateKinematics = (cx, by, phase, cycle, id = '', t) => {
 };
 
 const getTargetJoints = (id = '') => {
-    const lid = id.toLowerCase().replace(/[-_ ]/g, '');
+    const lid = String(id || '').toLowerCase().replace(/[-_ ]/g, '');
     if (lid.includes('knee') || lid.includes('squat')) return ['knee', 'hip'];
     if (lid.includes('shoulder')) return ['shoulder', 'arm'];
     if (lid.includes('elbow')) return ['arm'];

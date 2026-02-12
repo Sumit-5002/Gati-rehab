@@ -69,6 +69,7 @@ import { calculateDailyPlan } from '../engine/rehabEngine';
 import { getAIExerciseRecommendations } from '../services/aiRecommendationService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
+import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -205,7 +206,6 @@ const PatientDashboard = () => {
             });
 
             // Convert AI recommended exercise IDs to full exercise objects
-            const { AVAILABLE_EXERCISES } = await import('../../ai/utils/secondaryExercises');
             const aiExercises = aiRecommendations.exercises.map(exId => ({
               id: exId,
               ...AVAILABLE_EXERCISES[exId],
@@ -223,11 +223,15 @@ const PatientDashboard = () => {
           }
         } else if (todayData && todayData.length > 0) {
           // AI Modification: Apply intensity adjustment to the existing routine
-          const adjustedRoutine = todayData.map(ex => ({
-            ...ex,
-            sets: Math.max(1, Math.round((ex.sets || 3) * (generatedPlan.intensityAdjustment || 1))),
-            reps: Math.max(5, Math.round((ex.reps || 10) * (generatedPlan.intensityAdjustment > 1 ? generatedPlan.intensityAdjustment : 1)))
-          }));
+          const adjustedRoutine = todayData.map(ex => {
+            const exerciseInfo = AVAILABLE_EXERCISES[ex.exerciseId || ex.id];
+            return {
+              ...ex,
+              name: ex.name || exerciseInfo?.name || String(ex.exerciseId || ex.id).replace(/-/g, ' '),
+              sets: Math.max(1, Math.round((ex.sets || 3) * (generatedPlan.intensityAdjustment || 1))),
+              reps: Math.max(5, Math.round((ex.reps || 10) * (generatedPlan.intensityAdjustment > 1 ? generatedPlan.intensityAdjustment : 1)))
+            };
+          });
           setTodayRoutine(adjustedRoutine);
         } else {
           // Use AI-generated plan as fallback
@@ -449,7 +453,8 @@ const PatientDashboard = () => {
                 <div
                   key={idx}
                   onClick={() => {
-                    const exId = ex.id || ex.name?.toLowerCase().replace(/\s+/g, '-');
+                    // Optimized ID selection: Prefer exerciseId (if defined by doctor/AI), then fallback to slugified name
+                    const exId = ex.exerciseId || (typeof ex.id === 'string' && !/^\d+$/.test(ex.id) ? ex.id : String(ex.name || '').toLowerCase().replace(/\s+/g, '-'));
                     navigate('/workout', { state: { exerciseId: exId } });
                   }}
                   className="flex items-center gap-5 p-5 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:border-blue-100 transition-all cursor-pointer group"
