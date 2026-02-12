@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client'
 import './app/index.css'
 import App from './app/App.jsx'
 
+// Clear error reload flag if it exists
+if (sessionStorage.getItem('gati_error_reload')) {
+  sessionStorage.removeItem('gati_error_reload');
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

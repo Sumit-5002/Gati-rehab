@@ -60,12 +60,16 @@ export const getPatientStats = async (patientId) => {
     const patientSnap = await getDoc(patientRef);
     const patientData = patientSnap.exists() ? patientSnap.data() : {};
 
+    const completedSessions = patientData.completedSessions || 0;
+    const weeklyGoal = patientData.weeklyGoal || 5;
+    const calculatedRate = Math.min(100, Math.round((completedSessions / weeklyGoal) * 100));
+
     return {
-      totalSessions: patientData.completedSessions || 0,
-      weeklyGoal: patientData.weeklyGoal || 5,
+      totalSessions: completedSessions,
+      weeklyGoal: weeklyGoal,
       completed: weeklyCompleted,
       streak: patientData.streak || 0,
-      adherenceRate: patientData.adherenceRate || 0,
+      adherenceRate: patientData.adherenceRate !== undefined ? patientData.adherenceRate : calculatedRate,
     };
   } catch (error) {
     console.error('[PatientService] Get stats error:', error);
@@ -74,7 +78,7 @@ export const getPatientStats = async (patientId) => {
 };
 
 /**
- * Get patient's today routine
+ * Get patient's today routine with automatic daily reset
  */
 export const getTodayRoutine = async (patientId) => {
   try {
@@ -83,6 +87,29 @@ export const getTodayRoutine = async (patientId) => {
 
     if (routineSnap.exists()) {
       const data = routineSnap.data();
+      const lastUpdated = data.lastUpdated?.toDate ? data.lastUpdated.toDate() : new Date(data.lastUpdated || 0);
+      const today = new Date();
+
+      // Check if it's a new day (reset at midnight)
+      const isNewDay = !isSameDay(lastUpdated, today);
+
+      if (isNewDay) {
+        // Reset completion status for new day
+        const resetExercises = (data.exercises || []).map(ex => ({
+          ...ex,
+          completed: false
+        }));
+
+        // Update in Firestore
+        await updateDoc(routineRef, {
+          exercises: resetExercises,
+          lastUpdated: serverTimestamp()
+        });
+
+        console.log('[PatientService] Daily exercises reset for new day');
+        return resetExercises;
+      }
+
       return data.exercises || [];
     }
 
@@ -91,6 +118,66 @@ export const getTodayRoutine = async (patientId) => {
     console.error('[PatientService] Get routine error:', error);
     throw error;
   }
+};
+
+/**
+ * Save daily exercise plan (used by AI recommendations or doctor assignments)
+ */
+export const saveDailyPlan = async (patientId, exercises) => {
+  try {
+    const routineRef = doc(db, 'routines', patientId);
+    await setDoc(routineRef, {
+      exercises: exercises.map(ex => ({
+        ...ex,
+        completed: false
+      })),
+      lastUpdated: serverTimestamp(),
+      createdAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log('[PatientService] Daily plan saved successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[PatientService] Save daily plan error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark exercise as completed
+ */
+export const markExerciseCompleted = async (patientId, exerciseId) => {
+  try {
+    const routineRef = doc(db, 'routines', patientId);
+    const routineSnap = await getDoc(routineRef);
+
+    if (routineSnap.exists()) {
+      const data = routineSnap.data();
+      const updatedExercises = (data.exercises || []).map(ex =>
+        ex.id === exerciseId ? { ...ex, completed: true } : ex
+      );
+
+      await updateDoc(routineRef, {
+        exercises: updatedExercises
+      });
+
+      return { success: true };
+    }
+
+    return { success: false, error: 'Routine not found' };
+  } catch (error) {
+    console.error('[PatientService] Mark exercise completed error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper: Check if two dates are the same day
+ */
+const isSameDay = (date1, date2) => {
+  return date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate();
 };
 
 /**
@@ -222,33 +309,39 @@ export const getTrendData = async (patientId) => {
     };
 
     // 3. Fallback: If no trend data exists, compute from last 7 sessions
-    if (result.romData.length === 0 || result.qualityData.length === 0) {
+    if (!result.romData || result.romData.length === 0 || !result.qualityData || result.qualityData.length === 0) {
       const sessionsRef = collection(db, 'sessions');
+      // Fix: Removing orderBy to avoid composite index requirement
+      // We will sort client-side instead
       const q = query(
         sessionsRef,
         where('patientId', '==', patientId),
-        orderBy('date', 'asc'),
-        limit(7)
+        limit(20) // Get more to ensure we have enough after sorting
       );
+
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
-        const sessionMeds = snapshot.docs.map(doc => {
-          const data = doc.data();
-          const d = data.date?.toDate ? data.date.toDate() : new Date(data.date);
-          return {
-            day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-            rom: data.rangeOfMotion || 0,
-            quality: data.quality || 0,
-            timestamp: d.getTime()
-          };
-        });
+        // Process and sort sessions client-side
+        const processedSessions = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const d = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+            return {
+              day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+              rom: data.rangeOfMotion || 0,
+              quality: data.quality || 0,
+              timestamp: d.getTime()
+            };
+          })
+          .sort((a, b) => a.timestamp - b.timestamp) // Sort oldest to newest
+          .slice(-7); // Take last 7 days
 
-        if (result.romData.length === 0) {
-          result.romData = sessionMeds.map(s => ({ day: s.day, value: s.rom }));
+        if (!result.romData || result.romData.length === 0) {
+          result.romData = processedSessions.map(s => ({ day: s.day, value: s.rom }));
         }
-        if (result.qualityData.length === 0) {
-          result.qualityData = sessionMeds.map(s => ({ day: s.day, value: s.quality }));
+        if (!result.qualityData || result.qualityData.length === 0) {
+          result.qualityData = processedSessions.map(s => ({ day: s.day, value: s.quality }));
         }
       }
     }
@@ -256,6 +349,7 @@ export const getTrendData = async (patientId) => {
     return result;
   } catch (error) {
     console.error('[PatientService] Get trend data error:', error);
+    // Return empty arrays on error so UI doesn't break
     return {
       romData: [],
       qualityData: [],

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Dumbbell, Repeat, Clock, FileText, Pill, Trash, Target } from 'lucide-react';
+import { X, Plus, Trash2, Save, Dumbbell, Repeat, Clock, FileText, Pill, Trash, Target, ChevronRight } from 'lucide-react';
 import {
   getPatientRoutine,
   updatePatientRoutine,
@@ -7,14 +7,18 @@ import {
   addMedication,
   deleteMedication
 } from '../../services/doctorService';
+import { AVAILABLE_EXERCISES } from '../../../ai/utils/secondaryExercises';
+import { useTheme } from '../../../../contexts/ThemeContext';
 
 const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
+  const { isDarkMode } = useTheme();
   const [loading, setLoading] = useState(false);
   const [exercises, setExercises] = useState([]);
   const [newExercise, setNewExercise] = useState({
     name: '',
-    sets: '',
-    reps: '',
+    exerciseId: '',
+    sets: '3',
+    reps: '10',
     duration: '',
     notes: ''
   });
@@ -24,6 +28,12 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
     duration: '8 Weeks',
     observations: 'Focus on consistency over intensity.'
   });
+
+  const [showExerciseSearch, setShowExerciseSearch] = useState(false);
+  const exerciseList = Object.entries(AVAILABLE_EXERCISES).map(([id, data]) => ({
+    id,
+    ...data
+  }));
 
   const [meds, setMeds] = useState([]);
   const [newMed, setNewMed] = useState({ name: '', dosage: '', time: '', duration: '7' });
@@ -38,7 +48,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
 
   const loadMeds = async () => {
     const data = await getPatientMedications(patientId);
-    setMeds(data);
+    setMeds(Array.isArray(data) ? data : []);
   };
 
   const handleAddMed = async () => {
@@ -70,7 +80,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
     try {
       const routine = await getPatientRoutine(patientId);
       if (routine) {
-        if (routine.exercises) setExercises(routine.exercises);
+        setExercises(Array.isArray(routine.exercises) ? routine.exercises : []);
         setPlanDetails({
           phase: routine.phase || 'Recovery Initiation',
           target: routine.target || 'Mobility Restore',
@@ -90,8 +100,10 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
   const handleAddExercise = () => {
     if (!newExercise.name) return;
 
-    setExercises([...exercises, { ...newExercise, id: Date.now() }]);
-    setNewExercise({ name: '', sets: '', reps: '', duration: '', notes: '' });
+    // Use exerciseId as the primary ID to ensure correct lookup in workout session
+    const uniqueId = newExercise.exerciseId || `custom-${Date.now()}`;
+    setExercises([...exercises, { ...newExercise, id: uniqueId }]);
+    setNewExercise({ name: '', exerciseId: '', sets: '3', reps: '10', duration: '', notes: '' });
   };
 
   const handleRemoveExercise = (id) => {
@@ -125,16 +137,16 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
       />
 
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className={`relative rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
 
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-slate-50/50">
+          <div className={`flex items-center justify-between p-6 border-b ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-100 bg-slate-50/50'}`}>
             <div>
-              <h2 className="text-xl font-black text-slate-900">Manage Care Plan</h2>
-              <p className="text-sm font-medium text-slate-500">Assigning exercises for <span className="text-blue-600">{patientName}</span></p>
+              <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Manage Care Plan</h2>
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Assigning exercises for <span className="text-blue-600">{patientName}</span></p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-              <X className="w-5 h-5 text-slate-400" />
+            <button onClick={onClose} className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-700 text-slate-400' : 'hover:bg-slate-100 text-slate-400'}`}>
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -142,8 +154,8 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
           <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
 
             {/* Plan Strategy Details */}
-            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200">
-              <h3 className="text-sm font-black text-slate-900 mb-6 uppercase tracking-wider flex items-center gap-2">
+            <div className={`p-6 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-slate-50 border-slate-200'}`}>
+              <h3 className={`text-sm font-black mb-6 uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 <Target className="w-4 h-4 text-blue-600" /> Strategy Overview
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -151,7 +163,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                   <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase ml-1">Recovery Phase</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
                     value={planDetails.phase}
                     onChange={(e) => setPlanDetails({ ...planDetails, phase: e.target.value })}
                   />
@@ -160,7 +172,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                   <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase ml-1">Main Target</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
                     value={planDetails.target}
                     onChange={(e) => setPlanDetails({ ...planDetails, target: e.target.value })}
                   />
@@ -169,7 +181,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                   <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase ml-1">Total Duration</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
                     value={planDetails.duration}
                     onChange={(e) => setPlanDetails({ ...planDetails, duration: e.target.value })}
                   />
@@ -179,7 +191,7 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                 <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase ml-1">Clinical Observations / Guidance</label>
                 <textarea
                   rows="3"
-                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  className={`w-full px-4 py-3 rounded-2xl border text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-all ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
                   value={planDetails.observations}
                   onChange={(e) => setPlanDetails({ ...planDetails, observations: e.target.value })}
                 />
@@ -195,14 +207,31 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-12 md:col-span-6">
                     <div className="relative">
-                      <Dumbbell className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Exercise Name"
-                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                        value={newExercise.name}
-                        onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
-                      />
+                      <Dumbbell className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                      <select
+                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none appearance-none bg-white cursor-pointer hover:border-blue-200 transition-all"
+                        value={newExercise.exerciseId}
+                        onChange={(e) => {
+                          const selected = exerciseList.find(ex => ex.id === e.target.value);
+                          if (selected) {
+                            setNewExercise({
+                              ...newExercise,
+                              exerciseId: selected.id,
+                              name: selected.name,
+                              sets: selected.sets?.toString() || '3',
+                              reps: selected.repsPerSet?.toString() || '10'
+                            });
+                          }
+                        }}
+                      >
+                        <option value="" disabled>Select Exercise...</option>
+                        {exerciseList.map(ex => (
+                          <option key={ex.id} value={ex.id}>{ex.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <ChevronRight className="w-4 h-4 rotate-90" />
+                      </div>
                     </div>
                   </div>
                   <div className="col-span-4 md:col-span-2">
@@ -325,26 +354,26 @@ const ManagePlanModal = ({ isOpen, onClose, patientId, patientName }) => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                  <Repeat className="w-4 h-4 text-slate-400" /> Current Routine ({exercises.length})
+                  <Repeat className="w-4 h-4 text-slate-400" /> Current Routine ({Array.isArray(exercises) ? exercises.length : 0})
                 </h3>
-                {exercises.length > 0 && (
+                {Array.isArray(exercises) && exercises.length > 0 && (
                   <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
                     {exercises.length} Exercises Assigned
                   </span>
                 )}
               </div>
 
-              {exercises.length === 0 ? (
+              {Array.isArray(exercises) && exercises.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                   <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
                     <Dumbbell className="w-6 h-6 text-slate-300" />
                   </div>
                   <p className="text-slate-500 font-medium text-sm">No exercises assigned yet.</p>
-                  <p className="text-slate-400 text-xs">Use the form above to build a plan.</p>
+                  <p className="text-slate-400 text-xs">Use the list above to build a plan.</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
-                  {exercises.map((ex, idx) => (
+                  {Array.isArray(exercises) && exercises.map((ex, idx) => (
                     <div key={ex.id || idx} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm group hover:border-blue-200 hover:shadow-md transition-all">
                       <div className="flex-1 min-w-0 pr-4">
                         <h4 className="font-bold text-slate-900 truncate">{ex.name}</h4>

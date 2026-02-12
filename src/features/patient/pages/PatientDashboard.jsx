@@ -14,6 +14,7 @@ import {
   Video,
   ChevronRight,
   Bell,
+  BellOff,
   Plus,
   Target,
   Zap,
@@ -37,6 +38,7 @@ import {
 } from 'lucide-react';
 import NavHeader from '../../../shared/components/NavHeader';
 import Footer from '../../../shared/components/Footer';
+import { useTheme } from '../../../contexts/ThemeContext';
 import SessionReport from '../components/SessionReport';
 import PainTracker from '../components/PainTracker';
 
@@ -48,6 +50,8 @@ const PlanOverviewModal = lazy(() => import('../components/modals/PlanOverviewMo
 const TrendsModal = lazy(() => import('../components/modals/TrendsModal'));
 const VideoConsultationModal = lazy(() => import('../../../shared/components/modals/VideoConsultationModal'));
 const MedicationReminders = lazy(() => import('../components/MedicationReminders'));
+const OnboardingGuide = lazy(() => import('../components/OnboardingGuide'));
+const GatiAssistant = lazy(() => import('../components/GatiAssistant'));
 import { useAuth } from '../../auth/context/AuthContext';
 import { updateUserProfile } from '../../auth/services/authService';
 import {
@@ -56,16 +60,21 @@ import {
   getRecentSessions,
   subscribeToPatientData,
   subscribeToWeeklySessions,
-  getPainHistory
+  getPainHistory,
+  saveDailyPlan
 } from '../services/patientService';
+import { requestPushPermission, showPushNotification } from '../../../shared/services/notificationService';
 import { DEMO_CREDENTIALS, subscribeToUserData } from '../../auth/services/authService';
 import { calculateDailyPlan } from '../engine/rehabEngine';
+import { getAIExerciseRecommendations } from '../services/aiRecommendationService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase/config';
+import { AVAILABLE_EXERCISES } from '../../ai/utils/secondaryExercises';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   const [stats, setStats] = useState({
     totalSessions: 0,
@@ -88,6 +97,9 @@ const PatientDashboard = () => {
   const [planOpen, setPlanOpen] = useState(false);
   const [trendsOpen, setTrendsOpen] = useState(false);
   const [currentDoctor, setCurrentDoctor] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [gatiAssistantOpen, setGatiAssistantOpen] = useState(false);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(Notification.permission === 'granted');
 
   const handleSettingsUpdate = async (data) => {
     try {
@@ -112,6 +124,44 @@ const PatientDashboard = () => {
     return () => unsubscribe();
   }, [userData?.doctorId]);
 
+  // Check if user needs onboarding
+  useEffect(() => {
+    if (userData && !userData.hasCompletedOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, [userData]);
+
+  const handleOnboardingComplete = async () => {
+    if (user) {
+      await updateUserProfile(user.uid, { hasCompletedOnboarding: true });
+    }
+  };
+
+  // Notification Handling
+  const handleRequestPermission = async () => {
+    const granted = await requestPushPermission();
+    setHasNotificationPermission(granted);
+    if (granted) {
+      showPushNotification("Gati Protocol Active", "You'll receive updates on your recovery roadmap.");
+    }
+  };
+
+  useEffect(() => {
+    if (hasNotificationPermission && todayRoutine.length > 0) {
+      const pending = todayRoutine.filter(ex => !ex.completed).length;
+      if (pending > 0) {
+        // Send a gentle reminder on load if exercises are pending
+        const timer = setTimeout(() => {
+          showPushNotification(
+            "Daily Roadmap Pending",
+            `You have ${pending} exercises remaining for today. Maintain your ${stats.streak} day streak!`
+          );
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [hasNotificationPermission, todayRoutine.length, stats.streak]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -127,7 +177,10 @@ const PatientDashboard = () => {
         setStats(statsData);
         setRecentSessions(sessionsData);
 
-        // Run AI Decision Engine as a fallback/advisory
+        // Check if this is a new user (no sessions yet)
+        const isNewUser = sessionsData.length === 0 && (!todayData || todayData.length === 0);
+
+        // Run AI Decision Engine
         const generatedPlan = calculateDailyPlan(
           {
             injuryType: userData?.injuryType || 'General Recovery',
@@ -139,10 +192,49 @@ const PatientDashboard = () => {
 
         setAiPlan(generatedPlan);
 
-        // Priority: 1. Official Doctor Routine, 2. AI Generated Plan
-        if (todayData && todayData.length > 0) {
-          setTodayRoutine(todayData);
+        // For new users, get AI recommendations
+        if (isNewUser) {
+          try {
+            const aiRecommendations = await getAIExerciseRecommendations({
+              injuryType: userData?.injuryType || 'General Recovery',
+              rehabPhase: userData?.rehabPhase || 'Mid',
+              currentPainLevel: painData[0]?.level || 5,
+              fitnessLevel: userData?.fitnessLevel || 'Moderate',
+              age: userData?.age,
+              hasExercisedBefore: (sessionsData.length > 0),
+              specialNotes: userData?.medicalNotes
+            });
+
+            // Convert AI recommended exercise IDs to full exercise objects
+            const aiExercises = aiRecommendations.exercises.map(exId => ({
+              id: exId,
+              ...AVAILABLE_EXERCISES[exId],
+              completed: false
+            }));
+
+            // Save AI plan to Firestore
+            await saveDailyPlan(user.uid, aiExercises);
+            setTodayRoutine(aiExercises);
+
+            console.log('[PatientDashboard] AI recommendations applied:', aiRecommendations.source);
+          } catch (error) {
+            console.error('[PatientDashboard] AI recommendations failed, using fallback:', error);
+            setTodayRoutine(generatedPlan.exercises);
+          }
+        } else if (todayData && todayData.length > 0) {
+          // AI Modification: Apply intensity adjustment to the existing routine
+          const adjustedRoutine = todayData.map(ex => {
+            const exerciseInfo = AVAILABLE_EXERCISES[ex.exerciseId || ex.id];
+            return {
+              ...ex,
+              name: ex.name || exerciseInfo?.name || String(ex.exerciseId || ex.id).replace(/-/g, ' '),
+              sets: Math.max(1, Math.round((ex.sets || 3) * (generatedPlan.intensityAdjustment || 1))),
+              reps: Math.max(5, Math.round((ex.reps || 10) * (generatedPlan.intensityAdjustment > 1 ? generatedPlan.intensityAdjustment : 1)))
+            };
+          });
+          setTodayRoutine(adjustedRoutine);
         } else {
+          // Use AI-generated plan as fallback
           setTodayRoutine(generatedPlan.exercises);
         }
 
@@ -200,16 +292,18 @@ const PatientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-28">
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-[#F8FAFC]'}`}>
       <NavHeader
         userType="patient"
+        theme={isDarkMode ? 'dark' : 'light'}
+        onThemeToggle={toggleTheme}
         onSettingsClick={() => setSettingsOpen(true)}
       />
 
       <main role="main" className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
         <div className="mb-10 sm:mb-14">
           <div className="space-y-3">
-            <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tighter leading-tight">
+            <h1 className={`text-4xl sm:text-6xl font-black tracking-tighter leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Recovery <span className="text-blue-600">Hub</span>
             </h1>
             <div className="flex items-center gap-3">
@@ -225,6 +319,13 @@ const PatientDashboard = () => {
               >
                 <Terminal className="w-3.5 h-3.5 text-blue-400" />
                 Neural Lab
+              </button>
+              <button
+                onClick={handleRequestPermission}
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl ${hasNotificationPermission ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}
+              >
+                {hasNotificationPermission ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                {hasNotificationPermission ? 'Alerts On' : 'Enable Alerts'}
               </button>
             </div>
           </div>
@@ -287,7 +388,7 @@ const PatientDashboard = () => {
                     {/* Glowing Progress Ring */}
                     <circle cx="50%" cy="50%" r="42%" stroke="currentColor" strokeWidth="16" fill="transparent"
                       strokeDasharray="264"
-                      strokeDashoffset={264 - (264 * (stats.completed / (stats.weeklyGoal || 1)))}
+                      strokeDashoffset={264 - (264 * Math.min(1, (todayRoutine.filter(ex => ex.completed).length / (todayRoutine.length || 1))))}
                       strokeLinecap="round"
                       className="text-blue-500 transition-all duration-1000 ease-out" />
                     {/* Secondary inner ring for depth */}
@@ -296,7 +397,7 @@ const PatientDashboard = () => {
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <div className="text-center">
                       <span className="block text-6xl sm:text-7xl font-black text-white tracking-tighter">
-                        {Math.round((stats.completed / (stats.weeklyGoal || 1)) * 100)}%
+                        {Math.min(100, Math.round((todayRoutine.filter(ex => ex.completed).length / (todayRoutine.length || 1)) * 100))}%
                       </span>
                       <div className="flex items-center justify-center gap-2 mt-2">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -352,7 +453,8 @@ const PatientDashboard = () => {
                 <div
                   key={idx}
                   onClick={() => {
-                    const exId = ex.id || ex.name?.toLowerCase().replace(/\s+/g, '-');
+                    // Optimized ID selection: Prefer exerciseId (if defined by doctor/AI), then fallback to slugified name
+                    const exId = ex.exerciseId || (typeof ex.id === 'string' && !/^\d+$/.test(ex.id) ? ex.id : String(ex.name || '').toLowerCase().replace(/\s+/g, '-'));
                     navigate('/workout', { state: { exerciseId: exId } });
                   }}
                   className="flex items-center gap-5 p-5 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:border-blue-100 transition-all cursor-pointer group"
@@ -380,15 +482,15 @@ const PatientDashboard = () => {
             <StatCard
               icon={<Activity className="w-6 h-6" />}
               title="ADHERENCE"
-              value={`${stats.adherenceRate || Math.round((stats.completed / (stats.weeklyGoal || 5)) * 100)}%`}
-              trend={stats.adherenceRate > 80 ? "+Increased" : "Stable"}
+              value={`${Math.min(100, Math.round(stats.adherenceRate || (stats.completed / (stats.weeklyGoal || 5)) * 100))}%`}
+              trend={(stats.completed / (stats.weeklyGoal || 5)) >= 1 ? "Target Achieved" : (stats.completed / (stats.weeklyGoal || 5)) > 0.8 ? "High Progress" : "On Track"}
               color="blue"
             />
             <StatCard
               icon={<Calendar className="w-6 h-6" />}
-              title="GOAL PROGRESS"
-              value={`${stats.completed}/${stats.weeklyGoal}`}
-              trend={stats.completed >= stats.weeklyGoal ? "Goal Met!" : "On track"}
+              title="ROADMAP PROGRESS"
+              value={`${todayRoutine.filter(ex => ex.completed).length}/${todayRoutine.length}`}
+              trend={todayRoutine.filter(ex => ex.completed).length === todayRoutine.length && todayRoutine.length > 0 ? "Daily Goal Met!" : "Exercises for today"}
               color="indigo"
             />
             <StatCard
@@ -542,10 +644,10 @@ const PatientDashboard = () => {
                   }
                 </p>
                 <button
-                  onClick={() => setChatOpen(true)}
-                  className="w-full sm:w-auto px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-[2rem] font-black transition-all flex items-center justify-center gap-3 group active:scale-95"
+                  onClick={() => setGatiAssistantOpen(true)}
+                  className="w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white rounded-[2rem] font-black transition-all flex items-center justify-center gap-3 group active:scale-95 shadow-lg"
                 >
-                  <MessageSquare className="w-5 h-5" /> Consult Gati Assistant <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                  <MessageSquare className="w-5 h-5" /> Chat with Gati AI <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </button>
               </div>
             </div>
@@ -553,9 +655,10 @@ const PatientDashboard = () => {
             <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-blue-500/10 blur-[100px] rounded-full"></div>
           </div>
 
-          <Footer />
         </div>
       </main>
+
+      <Footer />
 
       <Suspense fallback={null}>
         <PlanOverviewModal
@@ -601,6 +704,22 @@ const PatientDashboard = () => {
           isOpen={trendsOpen}
           onClose={() => setTrendsOpen(false)}
           patientId={user?.uid}
+        />
+
+        <OnboardingGuide
+          isOpen={showOnboarding}
+          onClose={() => setShowOnboarding(false)}
+          onComplete={handleOnboardingComplete}
+        />
+
+        <GatiAssistant
+          isOpen={gatiAssistantOpen}
+          onClose={() => setGatiAssistantOpen(false)}
+          patientProfile={{
+            injuryType: userData?.injuryType,
+            rehabPhase: userData?.rehabPhase,
+            currentPainLevel: userData?.currentPainLevel || 5
+          }}
         />
       </Suspense>
     </div >

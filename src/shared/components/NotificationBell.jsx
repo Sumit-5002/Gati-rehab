@@ -3,12 +3,16 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell, X, Info, AlertTriangle, CheckCircle, Circle } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { subscribeToNotifications, markAsRead, markAllAsRead } from '../services/notificationService';
+import useEscapeKey from '../hooks/useEscapeKey';
 
 const NotificationBell = () => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
+
+    // Close dropdown on Escape key
+    useEscapeKey(() => setIsOpen(false), isOpen);
 
     useEffect(() => {
         if (!user) return;
@@ -43,8 +47,10 @@ const NotificationBell = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-white border border-slate-100 hover:border-blue-500/30 transition-all active:scale-90 shadow-sm"
-                aria-label="Notifications"
+                className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl bg-white border border-slate-100 hover:border-blue-500/30 transition-all active:scale-90 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+                aria-expanded={isOpen}
+                aria-haspopup="true"
             >
                 <Bell className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-12' : ''} ${unreadCount > 0 ? 'text-blue-600' : 'text-slate-400'}`} />
                 {unreadCount > 0 && (
@@ -77,8 +83,17 @@ const NotificationBell = () => {
                                 {notifications.map((n) => (
                                     <div
                                         key={n.id}
-                                        className={`p-5 hover:bg-slate-50 transition-colors cursor-pointer group ${!n.read ? 'bg-blue-50/30' : ''}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        className={`p-5 hover:bg-slate-50 transition-colors cursor-pointer group ${!n.read ? 'bg-blue-50/30' : ''} focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none focus-visible:bg-slate-50`}
                                         onClick={() => markAsRead(n.id)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                markAsRead(n.id);
+                                            }
+                                        }}
+                                        aria-label={`Notification: ${n.title}. ${n.message}`}
                                     >
                                         <div className="flex gap-4">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${!n.read ? 'bg-white' : 'bg-slate-50'}`}>

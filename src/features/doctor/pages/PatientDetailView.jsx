@@ -1,12 +1,9 @@
 // PatientDetailView - Detailed view of patient progress with charts
 // Owner: Member 5
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
 import { ArrowLeft, User, Calendar, Activity, Mail, Phone, TrendingUp, ClipboardList, X, Download, MessageSquare } from 'lucide-react';
-const PatientROMProgressChart = lazy(() => import('../components/charts/PatientROMProgressChart'));
-const PatientQualityTrendChart = lazy(() => import('../components/charts/PatientQualityTrendChart'));
 import NavHeader from '../../../shared/components/NavHeader';
 import Footer from '../../../shared/components/Footer';
 import SessionReport from '../../patient/components/SessionReport';
@@ -16,11 +13,16 @@ import { getPatientDetails, getPatientSessions } from '../services/doctorService
 import { exportToCSV } from '../../../shared/utils/csvExport';
 import { useAuth } from '../../auth/context/AuthContext';
 import { logAction } from '../../../shared/utils/auditLogger';
+import { useTheme } from '../../../contexts/ThemeContext';
+
+const PatientROMProgressChart = lazy(() => import('../components/charts/PatientROMProgressChart'));
+const PatientQualityTrendChart = lazy(() => import('../components/charts/PatientQualityTrendChart'));
 
 const PatientDetailView = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const { user, userData } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   // State management
   const [patient, setPatient] = useState(null);
@@ -108,8 +110,8 @@ const PatientDetailView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <NavHeader userType="doctor" doctorProfile={doctorProfile} />
+      <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <NavHeader userType="doctor" doctorProfile={doctorProfile} theme={isDarkMode ? 'dark' : 'light'} />
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -122,8 +124,8 @@ const PatientDetailView = () => {
 
   if (error || !patient) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <NavHeader userType="doctor" doctorProfile={doctorProfile} />
+      <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <NavHeader userType="doctor" doctorProfile={doctorProfile} theme={isDarkMode ? 'dark' : 'light'} />
         <div className="max-w-7xl mx-auto px-4 py-6">
           <button
             onClick={() => navigate('/doctor-dashboard')}
@@ -132,7 +134,7 @@ const PatientDetailView = () => {
             <ArrowLeft className="w-4 h-4" />
             <span className="font-medium">Back to Patients</span>
           </button>
-          <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+          <div className={`text-center py-12 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <p className="text-red-500 font-medium">{error || 'Patient not found'}</p>
           </div>
         </div>
@@ -141,8 +143,13 @@ const PatientDetailView = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavHeader userType="doctor" doctorProfile={doctorProfile} />
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
+      <NavHeader
+        userType="doctor"
+        doctorProfile={doctorProfile}
+        theme={isDarkMode ? 'dark' : 'light'}
+        onThemeToggle={toggleTheme}
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header Actions Row */}
@@ -159,7 +166,7 @@ const PatientDetailView = () => {
             <button
               onClick={handleExportData}
               disabled={sessions.length === 0}
-              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              className={`flex items-center gap-2 border px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-slate-300 hover:bg-gray-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
             >
               <Download className="w-4 h-4" />
               Export Clinical Report
@@ -174,7 +181,7 @@ const PatientDetailView = () => {
             </button>
             <button
               onClick={() => setManagePlanOpen(true)}
-              className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95"
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl active:scale-95 ${isDarkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
             >
               <ClipboardList className="w-4 h-4" />
               Manage Care Plan
@@ -183,14 +190,14 @@ const PatientDetailView = () => {
         </div>
 
         {/* Patient Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className={`rounded-2xl shadow-sm border p-6 mb-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-col lg:flex-row items-start justify-between gap-6">
             <div className="flex items-start gap-4 flex-1">
               <div className="w-20 h-20 bg-blue-100 rounded-2xl flex items-center justify-center">
                 <User className="w-10 h-10 text-blue-600" />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl font-black text-gray-900 leading-tight">
+                <h1 className={`text-3xl font-black leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   {patient.name}
                 </h1>
                 <p className="text-lg font-medium text-gray-500 mt-1">{patient.condition}</p>
@@ -198,14 +205,14 @@ const PatientDetailView = () => {
                 {/* Contact Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                   {patient.email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Mail className="w-4 h-4 text-blue-400" />
                       <span>{patient.email}</span>
                     </div>
                   )}
                   {patient.phoneNumber && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Phone className="w-4 h-4 text-blue-400" />
                       <span>{patient.phoneNumber}</span>
                     </div>
                   )}
@@ -219,7 +226,7 @@ const PatientDetailView = () => {
                   <div className="flex items-center gap-1">
                     <Activity className="w-4 h-4" />
                     <span>
-                      Sessions: {patient.completedSessions}/{patient.totalSessions}
+                      Sessions: {patient.completedSessions}/{patient.totalSessions || 5}
                     </span>
                   </div>
                 </div>
@@ -227,16 +234,24 @@ const PatientDetailView = () => {
             </div>
 
             {/* Adherence Badge */}
-            <div className="text-center bg-green-50 border border-green-100 rounded-2xl p-6 min-w-[160px]">
-              <div className="text-4xl font-black text-green-600">
-                {patient.adherenceRate}%
-              </div>
-              <p className="text-sm text-gray-600 mt-1 font-bold">Adherence Rate</p>
-              <div className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                <TrendingUp className="w-3 h-3" />
-                {patient.progressLevel}
-              </div>
-            </div>
+            {(() => {
+              const displayAdherence = Math.max(
+                patient.adherenceRate || 0,
+                Math.min(100, Math.round(((patient.completedSessions || 0) / (patient.totalSessions || 5)) * 100))
+              );
+              return (
+                <div className={`text-center rounded-2xl p-6 min-w-[160px] border transition-all ${isDarkMode ? 'bg-emerald-900/10 border-emerald-900/40 text-emerald-400' : 'bg-green-50 border-green-100 text-green-600'}`}>
+                  <div className={`text-4xl font-black ${isDarkMode ? 'text-emerald-400' : 'text-green-600'}`}>
+                    {displayAdherence}%
+                  </div>
+                  <p className={`text-sm mt-1 font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>Adherence Rate</p>
+                  <div className={`inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-xs font-bold ${isDarkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-green-100 text-green-700'}`}>
+                    <TrendingUp className="w-3 h-3" />
+                    {patient.progressLevel}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -244,21 +259,21 @@ const PatientDetailView = () => {
         {sessions.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Range of Motion Trend */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 Range of Motion Progress
               </h2>
-              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading ROM...</div>}>
+              <Suspense fallback={<div className={`h-[300px] flex items-center justify-center rounded-xl animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>Loading ROM...</div>}>
                 <PatientROMProgressChart data={chartData.rom} />
               </Suspense>
             </div>
 
             {/* Quality Score Trend */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 Session Quality Trend
               </h2>
-              <Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-slate-50 rounded-xl animate-pulse">Loading Quality...</div>}>
+              <Suspense fallback={<div className={`h-[300px] flex items-center justify-center rounded-xl animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>Loading Quality...</div>}>
                 <PatientQualityTrendChart data={chartData.quality} />
               </Suspense>
             </div>
@@ -272,8 +287,8 @@ const PatientDetailView = () => {
         )}
 
         {/* Recent Sessions */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+        <div className={`rounded-2xl shadow-sm border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <h2 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Recent Sessions
           </h2>
           {sessions.length > 0 ? (
@@ -282,7 +297,9 @@ const PatientDetailView = () => {
                 <SessionReport key={session.id || index} sessionData={{
                   ...session,
                   date: session.date?.toDate ? session.date.toDate().toLocaleDateString() : session.date,
-                  duration: session.duration ? `${Math.round(session.duration / 60)} min` : 'N/A'
+                  duration: session.durationSeconds
+                    ? `${Math.round(session.durationSeconds / 60)} min`
+                    : (typeof session.duration === 'string' ? session.duration : 'N/A')
                 }} />
               ))}
             </div>

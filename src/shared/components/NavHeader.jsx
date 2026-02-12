@@ -1,12 +1,12 @@
 
-// NavHeader Component - Navigation header with Auth integration
+// NavHeader Component - Navigation header with Auth integration and Dark Mode
 import { memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Activity, LayoutDashboard, LogOut, User, Settings, Zap, Compass, Sparkles, UserCircle, MessageSquare, FileText } from 'lucide-react';
+import { Home, Activity, LayoutDashboard, LogOut, User, Settings, Zap, Compass, Sparkles, UserCircle, MessageSquare, FileText, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import NotificationBell from './NotificationBell';
 
-const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettingsClick = null, theme = 'light' }) => {
+const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettingsClick = null, theme = 'light', onThemeToggle = null }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, userData } = useAuth();
@@ -26,9 +26,6 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
       alert('Logout failed. Please try again.');
     }
   };
-
-  // Determine which profile to show
-  const profile = userData || doctorProfile;
 
   return (
     <header className={`${isDark ? 'bg-[#0F172A]/80 border-white/5' : 'bg-white/70 border-slate-100/50'} backdrop-blur-xl sticky top-0 z-[100] border-b`}>
@@ -55,11 +52,10 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
               <h1 className={`${isDark ? 'text-white' : 'text-slate-900'} text-xl sm:text-2xl font-black tracking-tighter leading-none`}>
                 GATI<span className="text-blue-600">REHAB</span>
               </h1>
-              <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-0.5">Intelligence Lab</p>
             </div>
           </div>
 
-          {/* Navigation Links - Hidden on Mobile, Bottom Nav handles it */}
+          {/* Navigation Links */}
           <nav className="flex items-center gap-2 sm:gap-6">
             <div className="hidden md:flex items-center gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-100/50">
               {userType === 'patient' ? (
@@ -90,55 +86,24 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
                   />
                 </>
               ) : userType === 'admin' ? (
-                <>
-                  <NavButton
-                    active={isActive('/admin-dashboard')}
-                    onClick={() => navigate('/admin-dashboard')}
-                    icon={<LayoutDashboard className="w-4 h-4" />}
-                    label="System Panel"
-                  />
-                </>
+                <NavButton
+                  active={isActive('/admin-dashboard')}
+                  onClick={() => navigate('/admin-dashboard')}
+                  icon={<LayoutDashboard className="w-4 h-4" />}
+                  label="System Panel"
+                />
               ) : (
-                <>
-                  <NavButton
-                    active={isActive('/doctor-dashboard')}
-                    onClick={() => navigate('/doctor-dashboard')}
-                    icon={<LayoutDashboard className="w-4 h-4" />}
-                    label="Command Center"
-                  />
-                  <NavButton
-                    active={isActive('/analytics')}
-                    onClick={() => navigate('/doctor-dashboard')}
-                    icon={<Sparkles className="w-4 h-4" />}
-                    label="AI Insights"
-                  />
-                </>
+                <NavButton
+                  active={isActive('/doctor-dashboard')}
+                  onClick={() => navigate('/doctor-dashboard')}
+                  icon={<LayoutDashboard className="w-4 h-4" />}
+                  label="Command Center"
+                />
               )}
             </div>
 
-            {/* Profile & Logout */}
+            {/* Logout & Settings */}
             <div className={`flex items-center gap-1.5 sm:gap-4 pl-2 sm:pl-6 border-l ${isDark ? 'border-white/10' : 'border-slate-200/60'}`}>
-              <div
-                className={`${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100'} flex items-center gap-2 p-1 rounded-xl sm:rounded-2xl border shadow-sm transition-all cursor-pointer hover:border-blue-500/30`}
-                onClick={() => userType === 'patient' && navigate('/profile')}
-              >
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl ${isDark ? 'bg-white/5' : 'bg-slate-50'} flex items-center justify-center border ${isDark ? 'border-white/10' : 'border-slate-100'} overflow-hidden shrink-0`}>
-                  {profile?.photoURL ? (
-                    <img src={profile.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-                  )}
-                </div>
-                <div className="hidden lg:block text-left mr-2">
-                  <p className={`${isDark ? 'text-white' : 'text-slate-900'} text-xs sm:text-sm font-black leading-tight`}>
-                    {profile?.name?.split(' ')[0] || (userType === 'patient' ? 'Patient' : 'Health Specialist')}
-                  </p>
-                  <p className="text-[8px] sm:text-[9px] text-blue-500 uppercase tracking-widest font-black">
-                    {userType}
-                  </p>
-                </div>
-              </div>
-
               {onSettingsClick && (
                 <button
                   onClick={onSettingsClick}
@@ -146,6 +111,18 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
                   aria-label="Open settings"
                 >
                   <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              )}
+
+
+              {/* Dark Mode Toggle */}
+              {onThemeToggle && (
+                <button
+                  onClick={onThemeToggle}
+                  className={`${isDark ? 'bg-white/5 text-yellow-400 border-white/10 hover:text-yellow-300' : 'bg-slate-50 text-slate-600 border-slate-100 hover:text-slate-900'} p-2.5 sm:p-3 border rounded-xl sm:rounded-2xl transition-all active:scale-90 group`}
+                  aria-label="Toggle dark mode"
+                >
+                  {isDark ? <Sun className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:rotate-12" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:-rotate-12" />}
                 </button>
               )}
 
@@ -162,7 +139,6 @@ const NavHeader = memo(({ userType = 'patient', doctorProfile = null, onSettings
           </nav>
         </div>
       </div>
-
     </header>
   );
 });

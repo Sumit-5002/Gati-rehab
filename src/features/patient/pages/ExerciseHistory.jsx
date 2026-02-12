@@ -71,7 +71,7 @@ const ExerciseHistory = () => {
   }, [user]);
 
   const filteredSessions = sessions.filter(session =>
-    session.exerciseName.toLowerCase().includes(searchTerm.toLowerCase())
+    String(session.exerciseName || '').toLowerCase().includes(String(searchTerm || '').toLowerCase())
   );
 
   if (loading) {

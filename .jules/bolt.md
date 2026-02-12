@@ -5,3 +5,7 @@
 ## 2026-02-08 - High-Frequency Re-render Bottleneck in Workout Session
 **Learning:** Even with memoized children (like AIEngine), unstable props (literal objects/arrays created in render) will trigger redundant reconciliation and potential re-renders. Unused state updates (like frameData every 10 frames) in a high-frequency loop (60fps) waste CPU cycles even if they don't affect the final UI.
 **Action:** Always memoize object/array props passed to heavy components using `useMemo`. Remove unused state and ensure high-frequency updates are as isolated as possible. Wrap static global components like `NavHeader` in `memo` to ensure they stay stable during intensive tracking sessions.
+
+## 2026-02-10 - Throttled State Updates for High-Frequency UI
+**Learning:** Throttling React state updates (e.g., to ~15 FPS) in high-frequency loops (like pose tracking) drastically reduces reconciliation overhead without sacrificing user-perceived responsiveness for text-based feedback.
+**Action:** Use a `useRef` timestamp to guard `setState` calls in callbacks triggered at 60 FPS. Combine this with mutating history arrays in refs (`push`/`shift`) instead of spread/slice to eliminate O(N) copying overhead per frame.

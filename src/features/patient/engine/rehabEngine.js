@@ -44,7 +44,9 @@ export const calculateDailyPlan = (profile, painLogs = [], sessionHistory = []) 
     status = "Progressing";
     reasoning = "Excellent form and stable pain levels. Increasing challenge to drive neural adaptation and strength gains.";
   } else if (painLogs.length === 0) {
-    reasoning = "Initial protocol generated. Please provide daily feedback for calibration.";
+    reasoning = "Initial protocol generated. Awaiting first biometric data points for Gati AI calibration.";
+  } else {
+    reasoning = `AI Optimization: Maintaining protocol at ${Math.round(intensityAdjustment * 100)}% intensity. Movement patterns are ${highQuality ? 'stable and precise' : 'being monitored'}.`;
   }
 
   // Filter exercises based on injury type and phase

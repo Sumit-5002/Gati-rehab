@@ -216,6 +216,9 @@ export const getPrimaryAngle = (angles, exerciseType) => {
     'elbow-flex': getActiveAngle(angles.leftElbow, angles.rightElbow, 180),
     'squat': getActiveAngle(angles.leftKnee, angles.rightKnee, 180),
     'squats': getActiveAngle(angles.leftKnee, angles.rightKnee, 180),
+    'lateral-leg-raises': getActiveAngle(angles.leftHip, angles.rightHip, 180),
+    'arm-circles': getActiveAngle(angles.leftShoulder, angles.rightShoulder, 0),
+    'calf-raises': getActiveAngle(angles.leftAnkle, angles.rightAnkle, 180),
   };
 
   return exerciseAngleMap[exerciseType] || 0;

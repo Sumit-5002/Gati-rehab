@@ -37,6 +37,8 @@ src/
 └── utils/             # Global utility functions
 ```
 
+> **[View Detailed File Structure Documentation](./FILE_STRUCTURE.md)** - complete breakdown of all files and directories.
+
 ## 🛠️ Setup Instructions
 
 ### 1. Install Dependencies

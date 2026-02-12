@@ -7,6 +7,7 @@ import Webcam from 'react-webcam';
 import { Camera, Video, VideoOff, AlertCircle } from 'lucide-react';
 import { calculateAngles } from '../utils/angleCalculations';
 import { generateRealTimeFeedback, playAudioCue, speakFeedback } from '../utils/realTimeFeedback';
+import { AVAILABLE_EXERCISES } from '../utils/secondaryExercises';
 
 // Separate FPS counter component to minimize re-renders
 const FPSDisplay = memo(({ fps }) => (
@@ -15,7 +16,7 @@ const FPSDisplay = memo(({ fps }) => (
   </span>
 ));
 
-const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCount, settings = {} }) => {
+const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, onStatusChange, repCount, settings = {} }) => {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -65,10 +66,12 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
         });
 
         setIsModelLoaded(true);
+        if (onStatusChange) onStatusChange({ isLoaded: true, error: null });
         console.log('[AIEngine] MediaPipe Pose model loaded successfully');
       } catch (err) {
         console.error('[AIEngine] Error loading model:', err);
         setError('Failed to load AI model. Please refresh the page.');
+        if (onStatusChange) onStatusChange({ isLoaded: false, error: 'Failed to load AI model' });
       }
     };
 
@@ -138,9 +141,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
           const angles = calculateAngles(keypoints);
 
           if (angles) {
-            const feedback = generateRealTimeFeedback(angles, exerciseType, {
-              previousAngles: previousAnglesRef.current,
-            });
+            const feedback = generateRealTimeFeedback(angles, exerciseType, keypoints);
 
             // Handle Voice and Audio Feedback
             const now = Date.now();
@@ -149,7 +150,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
               if (now - lastOptimalTimeRef.current > 4000) {
                 if (!watchdogTriggeredRef.current || now - lastFeedbackTimeRef.current > 6000) {
                   if (settings.audioCues !== false) {
-                    speakFeedback(`Correction needed: ${feedback.message}`);
+                    speakFeedback(feedback.message); // Say exactly what's wrong (visibility or form)
                     playAudioCue('error');
                   }
                   lastFeedbackTimeRef.current = now;
@@ -157,7 +158,7 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
                 }
               } else {
                 // Regular feedback beeps/speech (throttled)
-                if (now - lastFeedbackTimeRef.current > 3000 && feedback.message !== lastFeedbackMessageRef.current) {
+                if (now - lastFeedbackTimeRef.current > 3500 && feedback.message !== lastFeedbackMessageRef.current) {
                   if (feedback.severity === 'error') {
                     if (settings.audioCues !== false) {
                       speakFeedback(feedback.message);
@@ -272,15 +273,6 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
       });
       ctx.fill();
     }
-
-    // Draw visibility indicators separately to avoid fillStyle switching in loop
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '10px Arial';
-    keypoints.forEach((keypoint, index) => {
-      if (keypoint.visibility > 0.5) {
-        ctx.fillText(index, keypoint.x * width + 8, keypoint.y * height - 8);
-      }
-    });
   };
 
   const toggleCamera = () => {
@@ -294,24 +286,21 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <Camera className="w-5 h-5 text-blue-400" />
-            <span className="text-sm font-medium text-slate-200 truncate">
-            {isModelLoaded ? 'AI Model Ready' : 'Loading AI Model...'}
-          </span>
           </div>
           {isCameraActive && (
             <FPSDisplay fps={fps} />
           )}
           {Number.isFinite(repCount) && (
-            <span className="text-xs font-bold text-blue-200 bg-blue-500/20 border border-blue-500/30 px-2.5 py-1 rounded-full">
-              Reps: {repCount}
+            <span className="text-xs font-black text-white bg-blue-600 px-3 py-1 rounded-lg shadow-lg shadow-blue-900/40">
+              REPS: {repCount}
             </span>
           )}
         </div>
         <button
           onClick={toggleCamera}
           className={`w-full sm:w-auto px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base ${isCameraActive
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
+            ? 'bg-red-500 hover:bg-red-600 text-white'
+            : 'bg-blue-500 hover:bg-blue-600 text-white'
             }`}
           disabled={!isModelLoaded}
         >
@@ -377,8 +366,8 @@ const AIEngine = memo(({ onPoseDetected, exerciseType, onFeedbackUpdate, repCoun
       {/* Exercise Info */}
       {exerciseType && (
         <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <p className="text-xs sm:text-sm font-medium text-blue-100">
-            Current Exercise: <span className="font-bold">{exerciseType}</span>
+          <p className="text-xs sm:text-sm font-medium text-blue-100 uppercase tracking-widest">
+            Exercise: <span className="font-black text-white">{AVAILABLE_EXERCISES[exerciseType]?.name || String(exerciseType).replace(/-/g, ' ')}</span>
           </p>
         </div>
       )}

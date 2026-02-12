@@ -14,6 +14,22 @@ class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, errorInfo) {
         console.error('[ErrorBoundary] Caught an error:', error, errorInfo);
+
+        // Handle "Failed to fetch dynamically imported module" error
+        // This usually happens when a new version is deployed and the old chunks are gone
+        const isChunkLoadError = error.message?.includes('Failed to fetch dynamically imported module') ||
+            error.message?.includes('Importing a module script failed') ||
+            error.name === 'ChunkLoadError';
+
+        if (isChunkLoadError) {
+            console.warn('[ErrorBoundary] Chunk load error detected. Attempting to reload page...');
+            // Check if we already tried to reload to avoid infinite loops
+            const hasReloaded = sessionStorage.getItem('gati_error_reload');
+            if (!hasReloaded) {
+                sessionStorage.setItem('gati_error_reload', 'true');
+                window.location.reload();
+            }
+        }
     }
 
     render() {

@@ -25,7 +25,7 @@ const SessionReport = memo(({ sessionData }) => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h3 className="text-xl font-black text-slate-900 tracking-tight capitalize">{exerciseName.replace(/-/g, ' ')}</h3>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight capitalize">{String(exerciseName || '').replace(/-/g, ' ')}</h3>
             <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
               Grade {getGrade(quality)}
             </span>
@@ -60,7 +60,9 @@ const SessionReport = memo(({ sessionData }) => {
         <ReportStat
           icon={<Timer className="w-4 h-4" />}
           label="Duration"
-          value={duration}
+          value={typeof duration === 'number'
+            ? `${Math.round(duration / 60)} min`
+            : (duration || 'N/A')}
           color="orange"
         />
       </div>

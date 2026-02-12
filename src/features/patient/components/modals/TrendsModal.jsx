@@ -13,29 +13,15 @@ const TrendsModal = ({ isOpen, onClose, patientId }) => {
             setLoading(true);
             try {
                 const data = await getTrendData(patientId);
-                // Fallback dummy data if nothing exists yet to show the UI
-                const mockRom = [
-                    { day: 'Mon', value: 45 },
-                    { day: 'Tue', value: 52 },
-                    { day: 'Wed', value: 48 },
-                    { day: 'Thu', value: 61 },
-                    { day: 'Fri', value: 58 },
-                    { day: 'Sat', value: 65 },
-                    { day: 'Sun', value: 72 },
-                ];
-                const mockQuality = [
-                    { day: 'Mon', value: 80 },
-                    { day: 'Tue', value: 85 },
-                    { day: 'Wed', value: 82 },
-                    { day: 'Thu', value: 90 },
-                    { day: 'Fri', value: 88 },
-                    { day: 'Sat', value: 92 },
-                    { day: 'Sun', value: 95 },
-                ];
+
+                // Only provide mock data if ABSOLUTELY no data exists and we want to show a demo
+                // But for real usage, we should probably show real (even if empty) data
+                // For now, keeping mock logic only if data is totally empty to avoid broken UI
+                // But the getTrendData fix should now return real session data
 
                 setTrends({
-                    romData: data.romData.length > 0 ? data.romData : mockRom,
-                    qualityData: data.qualityData.length > 0 ? data.qualityData : mockQuality
+                    romData: data.romData && data.romData.length > 0 ? data.romData : [],
+                    qualityData: data.qualityData && data.qualityData.length > 0 ? data.qualityData : []
                 });
             } catch (error) {
                 console.error("Trends Fetch Error:", error);

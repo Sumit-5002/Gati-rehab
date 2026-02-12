@@ -49,11 +49,31 @@ service cloud.firestore {
       );
     }
     
+    function isBootstrapAdmin() {
+      return request.auth.uid == 'uK7m9926Oua8JQAt3IpiZ4AWDyM2';
+    }
+
     function isNotChangingType() {
-      return resource == null || (
-        request.resource.data.userType == resource.data.userType &&
-        (!('role' in resource.data) || request.resource.data.role == resource.data.role)
-      );
+      // Admins and Bootstrap UID can set any type/role
+      if (isAdmin() || isBootstrapAdmin()) {
+        return true;
+      }
+
+      // For new documents (creation)
+      if (resource == null) {
+        let targetType = request.resource.data.get('userType', 'patient');
+        let targetRole = request.resource.data.get('role', 'patient');
+        let isBecomingAdmin = targetType == 'admin' || targetRole == 'admin';
+        let isBecomingDoctor = targetType == 'doctor' || targetRole == 'doctor';
+
+        // Non-admins cannot create admin accounts
+        // Non-admins can only create doctor accounts for themselves (self-signup)
+        return !isBecomingAdmin && (!isBecomingDoctor || isOwner(userId));
+      }
+
+      // For existing documents (updates)
+      return request.resource.data.get('userType', 'patient') == resource.data.get('userType', 'patient') &&
+             request.resource.data.get('role', 'patient') == resource.data.get('role', 'patient');
     }
 
     // 1. Users collection 
