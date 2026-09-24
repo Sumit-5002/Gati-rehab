@@ -37,7 +37,7 @@ function AppRoutes() {
   // Enable automatic session timeout (30 minutes)
   useSessionTimeout(30 * 60 * 1000);
 
-  if (loading) return null; // Let ProtectedRoute handle initial load spin
+  if (loading) return <PageLoader />;
 
   return (
     <Suspense fallback={<PageLoader />}>

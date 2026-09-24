@@ -1,11 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -29,7 +29,7 @@ service cloud.firestore {
     }
 
     function isDoctorOf(patientId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         get(/databases/$(database)/documents/users/$(patientId)).data.doctorId == request.auth.uid;
     }
 
@@ -40,94 +40,99 @@ service cloud.firestore {
 
     function isDocOwner(data) {
       return isAuthenticated() && (
-        data.userId == request.auth.uid || 
-        data.patientId == request.auth.uid || 
+        data.userId == request.auth.uid ||
+        data.patientId == request.auth.uid ||
         data.senderId == request.auth.uid ||
         data.receiverId == request.auth.uid ||
         data.recipientId == request.auth.uid ||
         (data.participants != null && request.auth.uid in data.participants)
       );
     }
-    
+
+    // Bootstrap admin allowlist lives in Firestore (config/admins.uids) instead
+    // of being hardcoded here, so no personal identifiers live in source control.
     function isBootstrapAdmin() {
-      return request.auth.uid == 'uK7m9926Oua8JQAt3IpiZ4AWDyM2';
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/config/admins) &&
+        request.auth.uid in get(/databases/$(database)/documents/config/admins).data.uids;
     }
 
-    function isNotChangingType() {
-      // Admins and Bootstrap UID can set any type/role
-      if (isAdmin() || isBootstrapAdmin()) {
-        return true;
-      }
+    function isNotChangingType(userId) {
+      let targetType = request.resource.data.get('userType', 'patient');
+      let targetRole = request.resource.data.get('role', 'patient');
+      let isBecomingAdmin = targetType == 'admin' || targetRole == 'admin';
+      let isBecomingDoctor = targetType == 'doctor' || targetRole == 'doctor';
 
-      // For new documents (creation)
-      if (resource == null) {
-        let targetType = request.resource.data.get('userType', 'patient');
-        let targetRole = request.resource.data.get('role', 'patient');
-        let isBecomingAdmin = targetType == 'admin' || targetRole == 'admin';
-        let isBecomingDoctor = targetType == 'doctor' || targetRole == 'doctor';
-
-        // Non-admins cannot create admin accounts
-        // Non-admins can only create doctor accounts for themselves (self-signup)
-        return !isBecomingAdmin && (!isBecomingDoctor || isOwner(userId));
-      }
-
-      // For existing documents (updates)
-      return request.resource.data.get('userType', 'patient') == resource.data.get('userType', 'patient') &&
-             request.resource.data.get('role', 'patient') == resource.data.get('role', 'patient');
+      // Admins and the bootstrap UID can set any type/role. New non-admin users
+      // cannot create admin accounts or create doctor accounts for other users.
+      return isAdmin() || isBootstrapAdmin() ||
+             (resource == null && !isBecomingAdmin && (!isBecomingDoctor || isOwner(userId))) ||
+             (resource != null &&
+              request.resource.data.get('userType', 'patient') == resource.data.get('userType', 'patient') &&
+              request.resource.data.get('role', 'patient') == resource.data.get('role', 'patient'));
     }
 
-    // 1. Users collection 
+    // 0. Bootstrap admin allowlist config (see isBootstrapAdmin above)
+    match /config/{document} {
+      allow read: if isAdmin() || isBootstrapAdmin();
+      // Allow one-time creation when no config exists yet (initial bootstrap),
+      // afterwards only existing admins can modify it.
+      allow write: if isAdmin() || !exists(/databases/$(database)/documents/config/admins);
+    }
+
+    // 1. Users collection
     match /users/{userId} {
       // Allow read if owner, admin, or if target is a patient (readable by doctors)
       allow read: if isOwner(userId) || isAdmin() || isPatientOf(userId) ||
-                     (isDoctor() && resource.data.userType == 'patient');
+                     (isDoctor() && resource.data.userType == 'patient') ||
+                     (isDoctor() && resource.data.doctorId == request.auth.uid);
 
-      // Allow create if owner (signup - but block self-admin except for bootstrap UID) or doctor/admin
-      allow create: if (isOwner(userId) && (request.resource.data.userType != 'admin' || userId == 'uK7m9926Oua8JQAt3IpiZ4AWDyM2')) ||
+      // Allow create if owner (signup - but block self-admin except bootstrap admins) or doctor/admin
+      allow create: if (isOwner(userId) && (request.resource.data.userType != 'admin' || isBootstrapAdmin())) ||
                      isDoctor() || isAdmin();
 
       // Allow update if owner (but not changing type), doctor (if patient is unassigned or assigned to them), or admin
-      allow update: if (isOwner(userId) && isNotChangingType()) ||
+      allow update: if (isOwner(userId) && isNotChangingType(userId)) ||
                      (isDoctor() && resource.data.userType == 'patient' && (resource.data.doctorId == request.auth.uid || resource.data.doctorId == null)) ||
                      isAdmin();
 
       allow delete: if isAdmin();
     }
-    
+
     // 2. Routines Collection
     match /routines/{userId} {
       allow read: if isOwner(userId) || isDoctorOf(userId) || isAdmin();
       allow write: if isOwner(userId) || isDoctorOf(userId) || isAdmin();
     }
-    
-    // 3. Sessions collection 
+
+    // 3. Sessions collection
     match /sessions/{sessionId} {
       allow create: if isAuthenticated() && request.resource.data.patientId == request.auth.uid;
       allow read: if isAuthenticated() && (isDocOwner(resource.data) || isDoctorOf(resource.data.patientId) || isAdmin());
       allow update, delete: if isAuthenticated() && (isDocOwner(resource.data) || isAdmin());
     }
-    
+
     // 4. Trends (Charts)
     match /trends/{patientId}/{document=**} {
       allow read: if isOwner(patientId) || isDoctorOf(patientId) || isAdmin();
       allow write: if isDoctorOf(patientId) || isAdmin();
     }
-    
+
     // 5. Pain Logs collection
     match /pain_logs/{logId} {
       allow create: if isAuthenticated() && (
-        request.resource.data.patientId == request.auth.uid || 
+        request.resource.data.patientId == request.auth.uid ||
         (request.resource.data.userId == request.auth.uid && request.resource.data.patientId == null)
       );
       allow read: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid || 
+        resource.data.patientId == request.auth.uid ||
         (resource.data.userId == request.auth.uid && resource.data.patientId == null) ||
         isDoctorOf(resource.data.patientId) ||
         (resource.data.userId != null && isDoctorOf(resource.data.userId)) ||
         isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid || 
+        resource.data.patientId == request.auth.uid ||
         (resource.data.userId == request.auth.uid && request.resource.data.patientId == null) ||
         isAdmin()
       );
@@ -140,12 +145,12 @@ service cloud.firestore {
         request.resource.data.patientId == request.auth.uid
       );
       allow read: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid || 
+        resource.data.patientId == request.auth.uid ||
         resource.data.doctorId == request.auth.uid ||
         isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
-        resource.data.patientId == request.auth.uid || 
+        resource.data.patientId == request.auth.uid ||
         resource.data.doctorId == request.auth.uid ||
         isAdmin()
       );
@@ -155,7 +160,7 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
       allow read: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid || 
+        resource.data.senderId == request.auth.uid ||
         resource.data.receiverId == request.auth.uid ||
         (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
         (resource.data.chatId != null && resource.data.chatId.matches('.*' + request.auth.uid + '.*')) ||
@@ -167,12 +172,12 @@ service cloud.firestore {
         isAdmin()
       );
     }
-    
+
     // 8. Progress Photos
     match /progress_photos/{photoId} {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
+        resource.data.userId == request.auth.uid ||
         isDoctorOf(resource.data.userId) ||
         isAdmin()
       );
@@ -181,7 +186,7 @@ service cloud.firestore {
     // 9. Medications collection
     match /medications/{medicationId} {
       allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
+        resource.data.userId == request.auth.uid ||
         isDoctorOf(resource.data.userId) ||
         isAdmin()
       );
@@ -191,7 +196,7 @@ service cloud.firestore {
         isAdmin()
       );
       allow update, delete: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
+        resource.data.userId == request.auth.uid ||
         isDoctorOf(resource.data.userId) ||
         isAdmin()
       );
@@ -202,7 +207,7 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow read: if isAdmin();
     }
-    
+
     // 11. Doctor Patients relationship matching
     match /doctor_patients/{doctorId}/patients/{patientId} {
       allow read, write: if request.auth.uid == doctorId || isOwner(patientId) || isAdmin();

@@ -165,7 +165,7 @@ export const getPatientSessions = async (patientId, limitCount = 50) => {
     const q = query(
       sessionsRef,
       where('patientId', '==', patientId)
-      // orderBy('date', 'desc'), 
+      // orderBy('date', 'desc'),
       // limit(limitCount)
     );
 
