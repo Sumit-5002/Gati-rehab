@@ -12,7 +12,15 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let unsubscribeUserData = null;
 
+        // Safety net: never let the app hang blank forever if the auth
+        // listener fails to resolve (e.g. stuck IndexedDB persistence).
+        const safetyTimer = setTimeout(() => {
+            console.warn('[AuthContext] Auth state took too long to resolve, unblocking UI');
+            setLoading(false);
+        }, 8000);
+
         const unsubscribeAuth = onAuthChange((data) => {
+            clearTimeout(safetyTimer);
             if (data?.user) {
                 setUser(data.user);
 
@@ -41,6 +49,7 @@ export const AuthProvider = ({ children }) => {
         });
 
         return () => {
+            clearTimeout(safetyTimer);
             unsubscribeAuth();
             if (unsubscribeUserData) unsubscribeUserData();
         };
@@ -52,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{ user, userData, loading, logout }}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };

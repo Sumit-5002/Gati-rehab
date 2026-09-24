@@ -1,9 +1,9 @@
 // Service Worker for PWA offline functionality
 // Optimized for mobile performance and offline experience
 
-const CACHE_NAME = 'gati-rehab-v2';
-const RUNTIME_CACHE = 'gati-runtime-v2';
-const API_CACHE = 'gati-api-v2';
+const CACHE_NAME = 'gati-rehab-v3';
+const RUNTIME_CACHE = 'gati-runtime-v3';
+const API_CACHE = 'gati-api-v3';
 
 // Assets to cache on install - Mobile optimized
 const PRECACHE_ASSETS = [
@@ -81,15 +81,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Mobile-optimized caching strategy
-  if (event.request.destination === 'image') {
+  if (event.request.mode === 'navigate' || event.request.url.endsWith('/index.html') || event.request.url.endsWith('/')) {
+    // HTML shell must always be fresh so it references the latest hashed assets
+    event.respondWith(networkFirstStrategy(event.request, RUNTIME_CACHE));
+  } else if (event.request.destination === 'image') {
     // Cache images with longer TTL for mobile
     event.respondWith(cacheFirstStrategy(event.request, 'images'));
   } else if (event.request.url.includes('/api/')) {
     // API calls - network first with cache fallback
     event.respondWith(networkFirstStrategy(event.request, API_CACHE));
-  } else {
-    // HTML and critical assets - cache first
+  } else if (event.request.url.includes('/assets/')) {
+    // Content-hashed build assets are immutable - safe to cache first
     event.respondWith(cacheFirstStrategy(event.request, RUNTIME_CACHE));
+  } else {
+    event.respondWith(networkFirstStrategy(event.request, RUNTIME_CACHE));
   }
 });
 

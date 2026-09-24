@@ -39,8 +39,17 @@ export const loginWithEmail = async (email, password, userType = 'patient') => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // SPECIAL: Auto-configure Admin if this specific UID logs in
-    if (user.uid === 'uK7m9926Oua8JQAt3IpiZ4AWDyM2') {
+    // SPECIAL: Auto-configure Admin if this UID is in the bootstrap allowlist
+    // (config/admins.uids in Firestore - never hardcoded here). Regular users
+    // don't have permission to read this doc, which just means "not an admin".
+    let bootstrapAdminUids = [];
+    try {
+      const bootstrapConfigSnap = await getDoc(doc(db, 'config', 'admins'));
+      bootstrapAdminUids = bootstrapConfigSnap.exists() ? (bootstrapConfigSnap.data().uids || []) : [];
+    } catch (lookupError) {
+      if (lookupError.code !== 'permission-denied') throw lookupError;
+    }
+    if (bootstrapAdminUids.includes(user.uid)) {
       console.log('[AuthService] Detected Admin UID. Ensuring Firestore profile exists...');
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
@@ -332,9 +341,17 @@ export const updateUserProfile = async (uid, data) => {
 const createUserDocument = async (uid, data) => {
   try {
     // Check if a placeholder document exists for this email
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', data.email));
-    const querySnapshot = await getDocs(q);
+    // (only doctors/admins have permission to list by email; regular
+    // users will get permission-denied here, which just means no
+    // placeholder exists for them - fall through to direct creation)
+    let querySnapshot = { empty: true, docs: [] };
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', data.email));
+      querySnapshot = await getDocs(q);
+    } catch (lookupError) {
+      if (lookupError.code !== 'permission-denied') throw lookupError;
+    }
 
     if (!querySnapshot.empty) {
       const placeholderDoc = querySnapshot.docs[0];

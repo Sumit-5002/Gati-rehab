@@ -1,5 +1,15 @@
 {
   "projects": {
-    "default": "gati-be796"
-  }
+    "default": "gati-rehab-firebase"
+  },
+  "targets": {
+    "gati-rehab-firebase": {
+      "hosting": {
+        "gati": [
+          "gati"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
